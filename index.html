@@ -721,6 +721,19 @@ canvas{display:block}
       <label class="li" style="cursor:pointer;gap:4px" title="取消勾選：所有磚面同色"><input type="checkbox" id="showCutChk" checked onchange="toggleShowCut(this.checked)">標示裁切磚</label>
     </div>
   </div>
+  <!-- 起鋪點數值列（地磚圖／壁磚圖） -->
+  <div id="orgBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 14px;border-bottom:1px solid var(--border);background:#F7FAFA;font-size:12px;color:var(--muted)">
+    <span style="font-weight:600;color:var(--accent)">起鋪點</span>
+    <select id="obFace" onchange="state.orgSel=this.value;updateOrgBar(true);scheduleRender()" style="width:auto;flex:none;min-width:120px;padding:3px 6px"></select>
+    <label style="display:flex;align-items:center;gap:3px">X<input id="obX" type="number" step="0.1" style="width:72px;flex:none;padding:3px 6px" oninput="orgBarInput()">cm</label>
+    <label style="display:flex;align-items:center;gap:3px">Y<input id="obY" type="number" step="0.1" style="width:72px;flex:none;padding:3px 6px" oninput="orgBarInput()">cm</label>
+    <span style="width:1px;height:16px;background:var(--border)"></span>
+    <span>偏移</span>
+    <label style="display:flex;align-items:center;gap:3px">X<input id="obDX" type="number" step="0.1" value="0" style="width:60px;flex:none;padding:3px 6px">cm</label>
+    <label style="display:flex;align-items:center;gap:3px">Y<input id="obDY" type="number" step="0.1" value="0" style="width:60px;flex:none;padding:3px 6px">cm</label>
+    <button class="btn btn-sm" onclick="orgBarOffset()">套用偏移</button>
+    <span id="obHint" style="font-size:11px"></span>
+  </div>
   <div class="canvas-wrap" id="canvasWrap">
     <canvas id="fc"></canvas>
     <div id="view3d" style="display:none;position:absolute;inset:0"></div>
@@ -1288,7 +1301,7 @@ function setView(v){
     document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';
   }
   if(!(isFloor||(isWall&&state.mode==='origin'))&&state.mode!=='select')setMode('select');
-  updateWallFaceLbl();
+  updateWallFaceLbl();updateOrgBar();
   scheduleRender();
 }
 
@@ -1591,6 +1604,49 @@ function drawSnapHover(){
   ctx.fillStyle='rgba(18,26,23,.85)';ctx.fillRect(bx,by,w,18);
   ctx.fillStyle='#FFF';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,bx+5,by+9);
   ctx.restore();
+}
+// ---- 起鋪點數值列：選目前圖面中的某一面，直接輸入或偏移 ----
+function orgBarFaces(){
+  if(state.view==='floor')return[{id:'floor',lbl:'地磚',hint:'X 由左、Y 由上（A 牆）算起'}];
+  return(state._wHits||[]).map(h=>h.kind==='seg'
+    ?{id:'seg:'+h.seg.key,lbl:'壁磚 '+h.seg.tag,hint:'X 由左、Y 由天花板往下算起',h}
+    :{id:'tub:'+h.face.s.id+':'+h.face.edge,lbl:h.face.label,hint:h.face.kind==='deck'?'X 由左、Y 由 A 側算起':'X 由左、Y 由缸緣往下算起',h});
+}
+function orgGet(id){
+  if(id==='floor')return{x:P().originX,y:P().originY};
+  const [k,a,b]=id.split(':');
+  if(k==='seg'){const sg=getSeg(a);if(!sg)return{x:0,y:0};const o=segOrigin(sg);return{x:Math.round(o.x)/10,y:Math.round(o.y)/10};}
+  const t=state.stickers.find(s=>String(s.id)===a);const o=t&&(t.faceOrgs||{})[b]||{};return{x:o.x||0,y:o.y||0};
+}
+function orgSet(id,x,y){
+  x=Math.round(x*10)/10;y=Math.round(y*10)/10;
+  if(id==='floor'){document.getElementById('originX').value=x;document.getElementById('originY').value=y;}
+  else{const [k,a,b]=id.split(':');
+    if(k==='seg'){state.wallOrgs=state.wallOrgs||{};state.wallOrgs[a]={mode:'custom',x,y};renderWallOrgPanel(true);}
+    else{const t=state.stickers.find(s=>String(s.id)===a);if(!t)return;t.faceOrgs=t.faceOrgs||{};t.faceOrgs[b]={x,y};if(t.selected)renderTubOrgs(t);}}
+  scheduleRender();
+}
+let _obSig='';
+function updateOrgBar(force){
+  const bar=document.getElementById('orgBar');if(!bar)return;
+  const show=state.spaceDone&&(state.view==='floor'||state.view==='wall');
+  bar.style.display=show?'flex':'none';if(!show)return;
+  const fs=orgBarFaces();if(!fs.length)return;
+  if(!fs.some(f=>f.id===state.orgSel))state.orgSel=fs[0].id;
+  const sel=document.getElementById('obFace'),sig=fs.map(f=>f.id+f.lbl).join('|');
+  if(force||sig!==_obSig){_obSig=sig;sel.innerHTML=fs.map(f=>`<option value="${f.id}">${f.lbl}</option>`).join('');}
+  sel.value=state.orgSel;sel.style.display=fs.length>1?'':'none';
+  const cur=fs.find(f=>f.id===state.orgSel),v=orgGet(state.orgSel),ae=document.activeElement;
+  ['obX','obY'].forEach((id,i)=>{const el=document.getElementById(id);if(force||ae!==el)el.value=i?v.y:v.x;});
+  document.getElementById('obHint').textContent=(fs.length>1?'':cur.lbl+'：')+cur.hint;
+}
+function orgBarInput(){
+  const x=+document.getElementById('obX').value||0,y=+document.getElementById('obY').value||0;
+  orgSet(state.orgSel,x,y);
+}
+function orgBarOffset(){
+  const v=orgGet(state.orgSel),dx=+document.getElementById('obDX').value||0,dy=+document.getElementById('obDY').value||0;
+  orgSet(state.orgSel,v.x+dx,v.y+dy);setTimeout(()=>updateOrgBar(true),30);
 }
 function setMode(m){
   state.mode=m;
@@ -2656,7 +2712,7 @@ function renderFloorView(){
     });
   });
 
-  if(state.view==='floor')drawSnapHover();
+  if(state.view==='floor'){drawSnapHover();updateOrgBar();}
   // Stats
   const orderBase=fullCount+uniqueCutSources;
   const order=Math.ceil(orderBase*(1+p.waste/100));
@@ -2881,7 +2937,7 @@ function renderTubFaceView(f){
   ctx.fillStyle='#7A776E';ctx.font='10px DM Mono,monospace';ctx.textBaseline='top';
   ctx.fillText(`${Math.round(f.w)/10} × ${Math.round(f.h)/10} cm　${f.spec.name} ${f.spec.tileW/10}×${f.spec.tileH/10} cm`,X+wPX/2,Y+hPX+8);
   drawOrgMark(X+(f.ox||0)*PX,Y+(f.oy||0)*PX,X,Y,wPX,hPX);
-  drawSnapHover();
+  drawSnapHover();updateOrgBar();
 }
 // 壁磚圖切換清單：各面牆＋浴缸貼磚面
 function allWallFaces(){
@@ -3084,8 +3140,9 @@ function renderWallView(){
     });
   }
   // 各段起鋪點標記
-  state._wHits.forEach(h=>{const o=segOrigin(h.seg,p);drawOrgMark(h.X+o.x*h.PX,h.Y+o.y*h.PX,h.X,h.Y,h.w*h.PX,h.h*h.PX);});
-  drawSnapHover();
+  state._wHits.forEach(h=>{const o=segOrigin(h.seg,p);drawOrgMark(h.X+o.x*h.PX,h.Y+o.y*h.PX,h.X,h.Y,h.w*h.PX,h.h*h.PX);
+    if(state.orgSel==='seg:'+h.seg.key&&state._wHits.length>1){ctx.save();ctx.strokeStyle='#F07020';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.strokeRect(h.X-3,h.Y-3,h.w*h.PX+6,h.h*h.PX+6);ctx.restore();}});
+  drawSnapHover();updateOrgBar();
 }
 // 起鋪點標記（只畫在該面範圍內）
 function drawOrgMark(x,y,X,Y,W,H){
@@ -4025,12 +4082,13 @@ canvas.addEventListener('mousedown',e=>{
     const rc=canvas.getBoundingClientRect(),r=wallSnapAt(e.clientX-rc.left,e.clientY-rc.top);if(!r)return;
     const x=Math.round(r.x)/10,y=Math.round(r.y)/10;
     if(r.hit.kind==='seg'){
-      state.wallOrgs=state.wallOrgs||{};state.wallOrgs[r.hit.seg.key]={mode:'custom',x,y};renderWallOrgPanel(true);
+      state.wallOrgs=state.wallOrgs||{};state.wallOrgs[r.hit.seg.key]={mode:'custom',x,y};renderWallOrgPanel(true);state.orgSel='seg:'+r.hit.seg.key;
     }else{
+      state.orgSel='tub:'+r.hit.face.s.id+':'+r.hit.face.edge;
       const s=r.hit.face.s;s.faceOrgs=s.faceOrgs||{};s.faceOrgs[r.hit.face.edge]={x,y};
       if(s.selected)renderTubOrgs(s);
     }
-    scheduleRender();return;
+    scheduleRender();setTimeout(()=>updateOrgBar(true),30);return;
   }
   if(state.view!=='floor')return;
   const rect=canvas.getBoundingClientRect();
@@ -4043,7 +4101,7 @@ canvas.addEventListener('mousedown',e=>{
     const r=floorSnapAt(cx,cy);if(!r)return;
     document.getElementById('originX').value=Math.round(r.x)/10;
     document.getElementById('originY').value=Math.round(r.y)/10;
-    scheduleRender();return;
+    scheduleRender();setTimeout(()=>updateOrgBar(true),30);return;
   }
 
   if(state.mode==='select'&&V3.renderer){return;}
