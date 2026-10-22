@@ -1078,7 +1078,9 @@ function renderSpacePanel(){
     </div>
     <div style="display:flex;align-items:center;gap:4px;margin-top:4px;font-size:11px;color:var(--muted)">靠齊牆面
       ${[['L','←','靠左牆'],['U','↑','靠上牆'],['D','↓','靠下牆'],['R','→','靠右牆']].map(([k,a,t])=>`<button class="item-btn" style="width:26px;height:22px;font-size:13px" title="${t}" onclick="alignCol(${o.id},'${k}')">${a}</button>`).join('')}
-    </div></div>`).join('')||'<div class="info-tip">尚未設定。X、Y 為左上角距淨空間左上角的距離（cm）。</div>';
+    </div>${(()=>{const g=colWallGaps(o),N={L:['左','←'],R:['右','→'],U:['上','↑'],D:['下','↓']};
+      const w=Object.entries(g).filter(([k,v])=>v!=null&&v>0.5&&v<30).map(([k,v])=>`距${N[k][0]}牆只有 ${Math.round(v)/10} cm，會產生很窄的細縫牆面（可按 ${N[k][1]} 靠齊）`);
+      return w.length?`<div class="info-tip" style="color:#B5651D;margin-top:3px">⚠ ${w.join('；')}</div>`:'';})()}</div>`).join('')||'<div class="info-tip">尚未設定。X、Y 為左上角距淨空間左上角的距離（cm）。</div>';
   addUnits();updateSpaceState();
 }
 // 空間設定：數字欄位旁加上單位
@@ -1107,6 +1109,15 @@ function addCol(type){
   renderSpacePanel();renderObsList();scheduleRender();
 }
 // 柱子快速靠齊：往指定方向找最近、且與柱子範圍重疊的牆面
+// 柱子四邊到最近牆面的距離（mm）；沒有對向的牆回傳 null
+function colWallGaps(o){
+  const p=P(),d=innerDim(),ring=buildSpace(p,d,true).segs.filter(g=>g.kind==='wall');
+  const x1=o.x*10,x2=(o.x+o.w)*10,y1=o.y*10,y2=(o.y+o.h)*10,ov=(a,b,c,e)=>Math.min(b,e)-Math.max(a,c)>0.5;
+  const near=(axis,side,lo,hi,cmp,pick)=>{const c=ring.filter(g=>g.axis===axis&&g.side===side&&ov(g.a,g.b,lo,hi)&&cmp(g.c)).map(g=>g.c);return c.length?pick(...c):null;};
+  const L=near('v',1,y1,y2,c=>c<=x1+1,Math.max),R=near('v',-1,y1,y2,c=>c>=x2-1,Math.min);
+  const U=near('h',1,x1,x2,c=>c<=y1+1,Math.max),D=near('h',-1,x1,x2,c=>c>=y2-1,Math.min);
+  return{L:L==null?null:x1-L,R:R==null?null:R-x2,U:U==null?null:y1-U,D:D==null?null:D-y2};
+}
 function alignCol(id,dir){
   const o=state.obstacles.find(o=>o.id===id);if(!o)return;
   const p=P(),d=innerDim(),ring=buildSpace(p,d,true).segs.filter(g=>g.kind==='wall');
@@ -1124,7 +1135,7 @@ function alignCol(id,dir){
   o.x=Math.max(0,o.x);o.y=Math.max(0,o.y);
   renderSpacePanel();renderObsList();scheduleRender();
 }
-function setCol(id,f,v){const o=state.obstacles.find(o=>o.id===id);if(!o)return;o[f]=Math.max(f==='w'||f==='h'?1:0,+v||0);renderObsList();scheduleRender();}
+function setCol(id,f,v){const o=state.obstacles.find(o=>o.id===id);if(!o)return;o[f]=Math.max(f==='w'||f==='h'?1:0,+v||0);renderObsList();scheduleRender();clearTimeout(setCol._t);setCol._t=setTimeout(()=>{const a=document.activeElement,id0=a&&a.closest&&a.closest('#colList')?[...document.querySelectorAll('#colList input')].indexOf(a):-1;renderSpacePanel();if(id0>=0){const n=document.querySelectorAll('#colList input')[id0];if(n){n.focus();const L=n.value.length;try{n.setSelectionRange(L,L);}catch(e){}}}},600);}
 // 由目前的矩形 / L 型轉成逐段輸入
 function shapeToSteps(){
   const p=P(),d=innerDim(),segs=buildSpace(p,d).loops[0]||[];
@@ -1554,7 +1565,9 @@ function faceSnapData(h){
 }
 function wallSnapAt(cx,cy){
   const hs=state._wHits||[],pad=8;
-  const h=hs.find(h=>cx>=h.X-pad&&cx<=h.X+h.w*h.PX+pad&&cy>=h.Y-pad&&cy<=h.Y+h.h*h.PX+pad);if(!h)return null;
+  const inR=(h,m)=>cx>=h.X-m&&cx<=h.X+h.w*h.PX+m&&cy>=h.Y-m&&cy<=h.Y+h.h*h.PX+m;
+  const ctr=h=>Math.hypot(cx-(h.X+h.w*h.PX/2),cy-(h.Y+h.h*h.PX/2));
+  const h=hs.filter(h=>inR(h,0)).sort((a,b)=>ctr(a)-ctr(b))[0]||hs.filter(h=>inR(h,pad)).sort((a,b)=>ctr(a)-ctr(b))[0];if(!h)return null;
   const mx=(cx-h.X)/h.PX,my=(cy-h.Y)/h.PX,sd=faceSnapData(h);
   const r=snapPoint(mx,my,sd.xs,sd.ys,sd.pts,SNAP_PX/h.PX);
   r.x=Math.max(0,Math.min(h.w,r.x));r.y=Math.max(0,Math.min(h.h,r.y));
@@ -1564,12 +1577,15 @@ function wallSnapAt(cx,cy){
 function drawSnapHover(){
   const r=state.snapHover;if(!r||state.mode!=='origin')return;
   ctx.save();
+  if(r.hit){const h=r.hit;ctx.strokeStyle='#F07020';ctx.lineWidth=3;ctx.setLineDash([]);ctx.strokeRect(h.X-1.5,h.Y-1.5,h.w*h.PX+3,h.h*h.PX+3);
+    ctx.fillStyle='rgba(240,112,32,.08)';ctx.fillRect(h.X,h.Y,h.w*h.PX,h.h*h.PX);}
   ctx.strokeStyle=r.snap===2?'#C0392B':'#F07020';ctx.lineWidth=1;ctx.setLineDash([4,3]);
   if(r.snap){ctx.beginPath();ctx.moveTo(r.px,r.py-2000);ctx.lineTo(r.px,r.py+2000);ctx.moveTo(r.px-2000,r.py);ctx.lineTo(r.px+2000,r.py);ctx.globalAlpha=.35;ctx.stroke();ctx.globalAlpha=1;}
   ctx.setLineDash([]);ctx.lineWidth=2;ctx.beginPath();
   if(r.snap===2){ctx.rect(r.px-6,r.py-6,12,12);}else{ctx.arc(r.px,r.py,6,0,Math.PI*2);}
   ctx.stroke();
-  const t=(r.lbl?r.lbl+'  ':'')+`${Math.round(r.x)/10}, ${Math.round(r.y)/10}`;
+  const tag=r.hit?(r.hit.kind==='seg'?r.hit.seg.tag:(r.hit.face.kind==='deck'?'檯面':'裙牆')):'';
+  const t=(tag?tag+'｜':'')+(r.lbl?r.lbl+'  ':'')+`${Math.round(r.x)/10}, ${Math.round(r.y)/10}`;
   ctx.font='11px DM Mono,Noto Sans TC,monospace';const w=ctx.measureText(t).width+10;
   let bx=r.px+10,by=r.py-24;if(bx+w>canvas.width-2)bx=Math.max(2,r.px-10-w);if(by<2)by=r.py+8;
   ctx.fillStyle='rgba(18,26,23,.85)';ctx.fillRect(bx,by,w,18);
@@ -2984,14 +3000,15 @@ function renderWallView(){
   const PAD=24,LBLH=26,FOOTER=40,RETGAP=18,RETLBL=34;
   const flankPX=FLANK*PX,mainPX=g.len*PX,hPX=wallHmm*PX;
   const retW=g.rets.reduce((t,r)=>t+r.len*PX,0)+Math.max(0,g.rets.length-1)*RETGAP;
-  const needW=Math.max(flankPX+mainPX+flankPX,retW)+PAD*2,cw=Math.max(needW,380);
-  const retH=g.rets.length?RETLBL+hPX+24:0;
+  const RG=g.rets.length?72:0; // 主立面與右側「側面」區的間距
+  const needW=flankPX+mainPX+flankPX+RG+retW+PAD*2,cw=Math.max(needW,380);
+  const retH=0;
   canvas.width=Math.ceil(cw);
   canvas.height=Math.ceil(hPX+LBLH+FOOTER+PAD*2+retH);
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#EEF4F5';ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  const top=PAD+LBLH,mw=flankPX+mainPX+flankPX,ox=(cw-mw)/2;
+  const top=PAD+LBLH,mw=flankPX+mainPX+flankPX,ox=(cw-mw-RG-retW)/2;
   const lX=ox, mX=ox+flankPX, rX=ox+flankPX+mainPX;
   const hatch=(x0,y0,w,h)=>{ctx.save();ctx.fillStyle='#5E6264';ctx.fillRect(x0,y0,w,h);
     ctx.beginPath();ctx.rect(x0,y0,w,h);ctx.clip();ctx.strokeStyle='#4D5153';ctx.lineWidth=0.5;
@@ -3049,10 +3066,11 @@ function renderWallView(){
 
   // 側面：柱/管道間凸出的側面
   if(g.rets.length){
-    const ry=top+hPX+FOOTER+RETLBL;
-    ctx.fillStyle='#7A776E';ctx.font='bold 11px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='bottom';
-    ctx.fillText('側面',(cw-retW)/2,ry-18);
-    let x=(cw-retW)/2;
+    const ry=top,rx0=rX+flankPX+RG;
+    ctx.fillStyle='rgba(94,98,100,.07)';ctx.fillRect(rx0-10,ry-22,retW+20,hPX+48);
+    ctx.fillStyle='#7A776E';ctx.font='bold 11px DM Mono,Noto Sans TC,monospace';ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillText('側面',rx0+retW/2,ry+hPX+16);
+    let x=rx0;
     g.rets.forEach(sg=>{
       const w=sg.len*PX;
       drawElevation(sg,x,ry,p,PX,wallHmm,wallTP);state._wHits.push({kind:'seg',seg:sg,X:x,Y:ry,w:sg.len,h:wallHmm,PX});
