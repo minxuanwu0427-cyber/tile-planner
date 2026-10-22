@@ -283,7 +283,7 @@ canvas{display:block}
       <span class="sb-chevron" id="chevronsbOrigin">▼</span>
     </div>
     <div class="sb-body hidden" id="sbOrigin">
-    <div class="info-tip" style="margin-bottom:7px">切換「設定起鋪點」模式後直接在圖面點選。X/Y 可輸入小數達到 mm 精度（例如 0.7 = 7mm）。</div>
+    <div class="info-tip" style="margin-bottom:7px">切換「設定起鋪點」模式後在圖面點選，靠近轉角會吸附到陽角／陰角（含柱、管道間、浴缸裙牆），靠近牆線會吸附到線上。X/Y 可輸入小數達到 mm 精度。</div>
     <div class="row">
       <div class="field"><label>X (cm)</label><input type="number" id="originX" value="0" step="0.1" oninput="scheduleRender()"></div>
       <div class="field"><label>Y (cm)</label><input type="number" id="originY" value="0" step="0.1" oninput="scheduleRender()"></div>
@@ -303,7 +303,7 @@ canvas{display:block}
       <span class="sb-chevron" id="chevronsbWallOrigin">▼</span>
     </div>
     <div class="sb-body hidden" id="sbWallOrigin">
-    <div class="info-tip" style="margin-bottom:6px">每面牆可選起磚方式；「自動」會從陽角起整磚，讓轉角的磚縫最少。Y 為距天花板（cm）。</div>
+    <div class="info-tip" style="margin-bottom:6px">每面牆可選起磚方式；「自動」會從陽角起整磚。Y 為距天花板（cm）。也可在壁磚圖按「設定起鋪點」直接點選，會吸附陽角、陰角、缸緣與門窗邊。</div>
     <div id="wallOrgList"></div>
     </div><!-- /sb-body sbWallOrigin -->
   </div>
@@ -406,6 +406,7 @@ canvas{display:block}
           <div style="font-size:10px;color:var(--muted);margin-bottom:3px">裙牆（沒靠牆的邊自動砌矮牆貼磚）</div>
           <div id="stTubEdges" style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;margin-bottom:6px"></div>
           <div class="row">
+            <div class="field"><label>砌牆高度 (cm)</label><input type="number" id="stTubH" min="1" step="0.5" oninput="applyStickerEdit()"></div>
             <div class="field"><label>貼磚種類</label>
               <select id="stTubTile" onchange="applyStickerEdit()"><option value="wall">壁磚</option><option value="floor">地磚</option></select>
             </div>
@@ -420,6 +421,9 @@ canvas{display:block}
             <div class="field"><label>距 B 側 (cm)</label><input type="number" id="stOffB" min="0" step="0.5" oninput="applyStickerEdit()"></div>
           </div>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;margin-top:4px;cursor:pointer"><input type="checkbox" id="stTubDeck" onchange="applyStickerEdit()">檯面貼磚</label>
+          <div style="font-size:10px;color:var(--muted);margin:8px 0 3px">裙牆／檯面起鋪點（與地、壁磚分開；X 由左、Y 由上緣算起）</div>
+          <div id="stTubOrgs"></div>
+          <div class="info-tip" style="margin-top:3px">也可在壁磚圖切到裙牆或檯面，按「設定起鋪點」直接點選，會吸附端點與缸緣。</div>
         </div>
         <div id="stElevRow" class="row" style="display:none">
           <div class="field"><label>高度 (cm)</label><input type="number" id="stElevH" min="1" oninput="applyStickerEdit()"></div>
@@ -1262,7 +1266,8 @@ function setView(v){
   const isFloor=v==='floor',isWall=v==='wall';
   const floorCtrl=document.getElementById('floorModeCtrl');
   const wallCtrl=document.getElementById('wallNavCtrl');
-  if(floorCtrl)floorCtrl.style.display=isFloor?'flex':'none';
+  if(floorCtrl)floorCtrl.style.display=isFloor||isWall?'flex':'none';
+  {const pb=document.getElementById('modeProc');if(pb)pb.style.display=isFloor?'':'none';}
   if(wallCtrl)wallCtrl.style.display=isWall?'flex':'none';
   const v3c=document.getElementById('v3dCtrl');
   if(v3c)v3c.style.display=v==='unfold'?'flex':'none';
@@ -1271,7 +1276,7 @@ function setView(v){
     document.getElementById('fc').style.display='block';
     document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';
   }
-  if(!isFloor&&state.mode!=='select')setMode('select');
+  if(!(isFloor||(isWall&&state.mode==='origin'))&&state.mode!=='select')setMode('select');
   updateWallFaceLbl();
   scheduleRender();
 }
@@ -1482,10 +1487,100 @@ function buildLFloorPath(ctx,tx,ty,owmm,ohmm,cwmm,chmm,wt,corner){
   ctx.closePath();
 }
 
+// ---- 起鋪點吸附：靠近轉角時吸到角點，靠近線時吸到該線 ----
+const SNAP_PX=10;
+function snapLine(v,lines,thr){let b=null,bd=thr;lines.forEach(l=>{const dd=Math.abs(l.v-v);if(dd<=bd){bd=dd;b=l;}});return b;}
+function snapPoint(x,y,xs,ys,pts,thr){
+  let best=null,bd=thr*1.4;
+  pts.forEach(q=>{const dd=Math.hypot(q.x-x,q.y-y);if(dd<=bd){bd=dd;best=q;}});
+  if(best)return{x:best.x,y:best.y,lbl:best.lbl,snap:2};
+  const sx=snapLine(x,xs,thr),sy=snapLine(y,ys,thr);
+  const lbl=[sx&&sx.lbl,sy&&sy.lbl].filter(Boolean).join('・');
+  return{x:sx?sx.v:Math.round(x),y:sy?sy.v:Math.round(y),lbl,snap:(sx?1:0)+(sy?1:0)};
+}
+const KIND_LBL={wall:'牆',column:'柱',pipe:'管道間'};
+// 地磚圖：可吸附的線（牆、柱、管道間、浴缸裙牆）與轉角
+function floorSnapData(){
+  const sm=spaceModel(),xs=[],ys=[],pts=[];
+  const cn=c=>c==='out'?'陽角':c==='in'?'陰角':'端點';
+  sm.segs.forEach(g=>{
+    const L=g.flip?g.b:g.a,R=g.flip?g.a:g.b,k=KIND_LBL[g.kind]||'';
+    (g.axis==='h'?ys:xs).push({v:g.c,lbl:k+'面'});
+    [[L,g.leftCorner],[R,g.rightCorner]].forEach(([al,c])=>{
+      const q=g.axis==='h'?{x:al,y:g.c}:{x:g.c,y:al};q.lbl=cn(c);
+      if(!pts.some(o=>Math.abs(o.x-q.x)<1&&Math.abs(o.y-q.y)<1))pts.push(q);
+    });
+  });
+  state.stickers.filter(t=>t.type==='bathtub'&&!t._placing).forEach(t=>{
+    const r=stkFootprint(t),ex=tubExposedEdges(t);
+    if(ex.includes('w'))xs.push({v:r.x1,lbl:'裙牆'});if(ex.includes('e'))xs.push({v:r.x2,lbl:'裙牆'});
+    if(ex.includes('n'))ys.push({v:r.y1,lbl:'裙牆'});if(ex.includes('s'))ys.push({v:r.y2,lbl:'裙牆'});
+    [[r.x1,r.y1],[r.x2,r.y1],[r.x2,r.y2],[r.x1,r.y2]].forEach(([x,y])=>{
+      const onWall=sm.segs.some(g=>g.axis==='h'?Math.abs(g.c-y)<5&&x>=g.a-5&&x<=g.b+5:Math.abs(g.c-x)<5&&y>=g.a-5&&y<=g.b+5);
+      pts.push({x,y,lbl:onWall?'浴缸陰角':'浴缸陽角'});
+    });
+  });
+  return{xs,ys,pts};
+}
+function floorSnapAt(cx,cy){
+  const p=P(),d=innerDim(),PX=PXpm(),wtmm=p.wallT*10;
+  const [wx,wy]=toWorld(cx,cy);const mx=wx-wtmm,my=wy-wtmm;
+  if(mx<-wtmm||my<-wtmm||mx>d.iw*10+wtmm||my>d.ih*10+wtmm)return null;
+  const sd=floorSnapData(),r=snapPoint(mx,my,sd.xs,sd.ys,sd.pts,SNAP_PX/PX);
+  r.x=Math.max(0,Math.min(d.iw*10,r.x));r.y=Math.max(0,Math.min(d.ih*10,r.y));
+  r.px=MARGIN+(wtmm+r.x)*PX;r.py=MARGIN+(wtmm+r.y)*PX;return r;
+}
+// 壁磚圖／裙牆：可吸附的線與轉角（面內座標 mm）
+function faceSnapData(h){
+  const xs=[],ys=[],pts=[];
+  if(h.kind==='seg'){
+    const sg=h.seg,cn=c=>c==='out'?'陽角':c==='in'?'陰角':'端點';
+    xs.push({v:0,lbl:cn(sg.leftCorner)},{v:h.w,lbl:cn(sg.rightCorner)});
+    ys.push({v:0,lbl:'天花'},{v:h.h,lbl:'地面'});
+    wallObsExclusions(sg.key,sg.len,h.h).forEach(e=>{
+      const t=e.type==='tub'?'浴缸':e.type==='door'?'門':'窗';
+      xs.push({v:e.x1,lbl:t+'邊'},{v:e.x2,lbl:t+'邊'});
+      ys.push({v:e.y1,lbl:e.type==='tub'?'缸緣':t+'邊'});if(e.type!=='tub')ys.push({v:e.y2,lbl:t+'邊'});
+      if(e.type==='tub'){pts.push({x:e.x1,y:e.y1,lbl:'缸緣陰角'},{x:e.x2,y:e.y1,lbl:'缸緣陰角'});}
+    });
+  }else{
+    const f=h.face;
+    if(f.kind==='apron'){xs.push({v:0,lbl:'裙牆端'},{v:h.w,lbl:'裙牆端'});ys.push({v:0,lbl:'缸緣'},{v:h.h,lbl:'地面'});}
+    else{xs.push({v:0,lbl:'檯面邊'},{v:h.w,lbl:'檯面邊'});ys.push({v:0,lbl:'檯面邊'},{v:h.h,lbl:'檯面邊'});
+      f.excl.forEach(e=>{xs.push({v:e.x1,lbl:'缸口'},{v:e.x2,lbl:'缸口'});ys.push({v:e.y1,lbl:'缸口'},{v:e.y2,lbl:'缸口'});});}
+  }
+  xs.forEach(a=>ys.forEach(b=>{if(!pts.some(q=>Math.abs(q.x-a.v)<1&&Math.abs(q.y-b.v)<1))pts.push({x:a.v,y:b.v,lbl:a.lbl===b.lbl?a.lbl:a.lbl+'・'+b.lbl});}));
+  return{xs,ys,pts};
+}
+function wallSnapAt(cx,cy){
+  const hs=state._wHits||[],pad=8;
+  const h=hs.find(h=>cx>=h.X-pad&&cx<=h.X+h.w*h.PX+pad&&cy>=h.Y-pad&&cy<=h.Y+h.h*h.PX+pad);if(!h)return null;
+  const mx=(cx-h.X)/h.PX,my=(cy-h.Y)/h.PX,sd=faceSnapData(h);
+  const r=snapPoint(mx,my,sd.xs,sd.ys,sd.pts,SNAP_PX/h.PX);
+  r.x=Math.max(0,Math.min(h.w,r.x));r.y=Math.max(0,Math.min(h.h,r.y));
+  r.px=h.X+r.x*h.PX;r.py=h.Y+r.y*h.PX;r.hit=h;return r;
+}
+// 滑鼠移動時的吸附提示
+function drawSnapHover(){
+  const r=state.snapHover;if(!r||state.mode!=='origin')return;
+  ctx.save();
+  ctx.strokeStyle=r.snap===2?'#C0392B':'#F07020';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+  if(r.snap){ctx.beginPath();ctx.moveTo(r.px,r.py-2000);ctx.lineTo(r.px,r.py+2000);ctx.moveTo(r.px-2000,r.py);ctx.lineTo(r.px+2000,r.py);ctx.globalAlpha=.35;ctx.stroke();ctx.globalAlpha=1;}
+  ctx.setLineDash([]);ctx.lineWidth=2;ctx.beginPath();
+  if(r.snap===2){ctx.rect(r.px-6,r.py-6,12,12);}else{ctx.arc(r.px,r.py,6,0,Math.PI*2);}
+  ctx.stroke();
+  const t=(r.lbl?r.lbl+'  ':'')+`${Math.round(r.x)/10}, ${Math.round(r.y)/10}`;
+  ctx.font='11px DM Mono,Noto Sans TC,monospace';const w=ctx.measureText(t).width+10;
+  let bx=r.px+10,by=r.py-24;if(bx+w>canvas.width-2)bx=Math.max(2,r.px-10-w);if(by<2)by=r.py+8;
+  ctx.fillStyle='rgba(18,26,23,.85)';ctx.fillRect(bx,by,w,18);
+  ctx.fillStyle='#FFF';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,bx+5,by+9);
+  ctx.restore();
+}
 function setMode(m){
   state.mode=m;
   ['select','origin','proc'].forEach(x=>{document.getElementById('mode'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===m);});
   canvas.style.cursor=m==='origin'?'crosshair':m==='proc'?'cell':'default';
+  state.snapHover=null;if(typeof scheduleRender==='function')scheduleRender();
 }
 
 function snapOrigin(pos){
@@ -1755,7 +1850,7 @@ function showStickerEditBox(s){
   document.getElementById('stTubBox').style.display=s.type==='bathtub'?'block':'none';
   if(s.type==='bathtub')fillTubBox(s);
   if(s.type==='bathroomCab')document.getElementById('stBasins').value=String(s.basins===2?2:1);
-  document.getElementById('stElevRow').style.display=(s.type==='toilet'||s.type==='bathtub'||s.type==='freeTub')?'flex':'none';
+  document.getElementById('stElevRow').style.display=(s.type==='toilet'||s.type==='freeTub')?'flex':'none';
   if(s.type==='toilet'||s.type==='bathtub'||s.type==='freeTub')document.getElementById('stElevH').value=stkHeight(s);
   if(isWallOnly)document.getElementById('stDepth3').value=stkDepth(s);
   updateAutoWallInfo(s);
@@ -1849,7 +1944,7 @@ function applyStickerEdit(){
       s.lift=Math.max(0,+document.getElementById('stLift').value||0);
     }
     if(s.type==='toilet'||s.type==='bathtub'||s.type==='freeTub'){
-      const v=+document.getElementById('stElevH').value;if(v>0)s.elevH=v;
+      const v=+document.getElementById(s.type==='bathtub'?'stTubH':'stElevH').value;if(v>0)s.elevH=v;
     }
     if(s.type==='bathroomCab')s.basins=+document.getElementById('stBasins').value===2?2:1;
     if(s.type==='bathtub'){
@@ -1886,10 +1981,28 @@ function fillTubBox(s){
   document.getElementById('stHoleW').value=Math.round(h.w)/10;document.getElementById('stHoleD').value=Math.round(h.d)/10;
   document.getElementById('stOffA').value=Math.round(h.offA)/10;document.getElementById('stOffB').value=Math.round(h.offB)/10;
   document.getElementById('stTubDeck').checked=tubDeckOn(s);
+  document.getElementById('stTubH').value=stkHeight(s);
+  renderTubOrgs(s);
+}
+// 浴缸各貼磚面的起鋪點輸入
+function renderTubOrgs(s){
+  const el=document.getElementById('stTubOrgs');if(!el)return;
+  const ids=tubExposedEdges(s).concat(tubDeckOn(s)?['deck']:[]);
+  const o=s.faceOrgs||{};
+  el.innerHTML=ids.length?ids.map(k=>{const v=o[k]||{x:0,y:0};
+    return `<div class="row" style="align-items:flex-end;margin-bottom:3px">
+      <div style="width:52px;font-size:11px;color:var(--accent);padding-bottom:7px">${k==='deck'?'檯面':'裙牆 '+TUB_EDGE_LBL[k]}</div>
+      <div class="field"><label>X (cm)</label><input type="number" step="0.1" value="${v.x}" oninput="setTubOrg('${k}','x',this.value)"></div>
+      <div class="field"><label>Y (cm)</label><input type="number" step="0.1" value="${v.y}" oninput="setTubOrg('${k}','y',this.value)"></div>
+    </div>`;}).join(''):'<div class="info-tip">沒有需要貼磚的裙牆或檯面。</div>';
+}
+function setTubOrg(k,f,v){
+  const s=state.stickers.find(s=>s.selected);if(!s)return;
+  s.faceOrgs=s.faceOrgs||{};const o=s.faceOrgs[k]=s.faceOrgs[k]||{x:0,y:0};o[f]=+v||0;scheduleRender();
 }
 function toggleTubEdge(e,on){
   const s=state.stickers.find(s=>s.selected);if(!s)return;
-  s.apronOff=s.apronOff||{};s.apronOff[e]=!on;scheduleRender();
+  s.apronOff=s.apronOff||{};s.apronOff[e]=!on;renderTubOrgs(s);scheduleRender();
 }
 // 地面設備：顯示會自動出現在哪幾面牆的立面
 function updateAutoWallInfo(s){
@@ -2527,6 +2640,7 @@ function renderFloorView(){
     });
   });
 
+  if(state.view==='floor')drawSnapHover();
   // Stats
   const orderBase=fullCount+uniqueCutSources;
   const order=Math.ceil(orderBase*(1+p.waste/100));
@@ -2663,18 +2777,20 @@ function tubFaces(){
     const r=stkFootprint(s),Hmm=stkHeight(s)*10,spec=tubTileSpec(s);
     tubExposedEdges(s).forEach(e=>{
       const w=(e==='n'||e==='s')?r.x2-r.x1:r.y2-r.y1;
-      out.push({kind:'apron',s,edge:e,label:`${s.label}・裙牆 ${TUB_EDGE_LBL[e]}`,w,h:Hmm,excl:[],spec});
+      const og=(s.faceOrgs||{})[e]||{};
+      out.push({kind:'apron',s,edge:e,label:`${s.label}・裙牆 ${TUB_EDGE_LBL[e]}`,w,h:Hmm,excl:[],spec,ox:(og.x||0)*10,oy:(og.y||0)*10});
     });
     if(tubDeckOn(s)){
       // 檯面（平面方向，上 = A 側）：挖掉缸口
       const h=tubHole(s);
-      out.push({kind:'deck',s,label:`${s.label}・檯面`,w:r.x2-r.x1,h:r.y2-r.y1,excl:[{x1:h.x1-r.x1,y1:h.y1-r.y1,x2:h.x2-r.x1,y2:h.y2-r.y1,type:'tubHole'}],spec});
+      const og=(s.faceOrgs||{}).deck||{};
+      out.push({kind:'deck',s,edge:'deck',label:`${s.label}・檯面`,w:r.x2-r.x1,h:r.y2-r.y1,excl:[{x1:h.x1-r.x1,y1:h.y1-r.y1,x2:h.x2-r.x1,y2:h.y2-r.y1,type:'tubHole'}],spec,ox:(og.x||0)*10,oy:(og.y||0)*10});
     }
   });
   return out;
 }
 function faceLayout(f){
-  return layoutSurface(f.w,f.h,0,0,f.spec.tileW,f.spec.tileH,f.spec.grout,f.spec.layout,f.excl);
+  return layoutSurface(f.w,f.h,f.ox||0,f.oy||0,f.spec.tileW,f.spec.tileH,f.spec.grout,f.spec.layout,f.excl);
 }
 // 浴缸貼磚統計（依使用的磚種分開）
 function calculateTubTiles(){
@@ -2719,7 +2835,7 @@ function drawTubAprons(tx,ty,wtmm,PX){
 }
 // 畫一個貼磚面（壁磚圖用 / 3D 貼圖用）
 function drawTubFaceSurface(f,X,Y,PX){
-  drawTileSurface(X,Y,f.w,f.h,0,0,false,false,f.excl,{tileW:f.spec.tileW,tileH:f.spec.tileH,grout:f.spec.grout,layout:f.spec.layout});
+  drawTileSurface(X,Y,f.w,f.h,f.ox||0,f.oy||0,false,false,f.excl,{tileW:f.spec.tileW,tileH:f.spec.tileH,grout:f.spec.grout,layout:f.spec.layout});
   f.excl.forEach(e=>{
     ctx.fillStyle='#F7F7F5';ctx.fillRect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX);
     ctx.strokeStyle='#8BB4D4';ctx.lineWidth=1.2;ctx.strokeRect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX);
@@ -2735,6 +2851,7 @@ function renderTubFaceView(f){
   ctx.fillStyle='#EEF4F5';ctx.fillRect(0,0,canvas.width,canvas.height);
   const X=PAD+20,Y=PAD+LBLH;
   drawTubFaceSurface(f,X,Y,PX);
+  state._wHits=[{kind:'tub',face:f,X,Y,w:f.w,h:f.h,PX}];
   if(f.kind==='apron'){
     ctx.strokeStyle='#F07020';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X-14,Y+hPX);ctx.lineTo(X+wPX+14,Y+hPX);ctx.stroke();
   } else {
@@ -2747,6 +2864,8 @@ function renderTubFaceView(f){
   ctx.fillText(f.label,X+wPX/2,PAD+LBLH/2);
   ctx.fillStyle='#7A776E';ctx.font='10px DM Mono,monospace';ctx.textBaseline='top';
   ctx.fillText(`${Math.round(f.w)/10} × ${Math.round(f.h)/10} cm　${f.spec.name} ${f.spec.tileW/10}×${f.spec.tileH/10} cm`,X+wPX/2,Y+hPX+8);
+  drawOrgMark(X+(f.ox||0)*PX,Y+(f.oy||0)*PX,X,Y,wPX,hPX);
+  drawSnapHover();
 }
 // 壁磚圖切換清單：各面牆＋浴缸貼磚面
 function allWallFaces(){
@@ -2880,7 +2999,8 @@ function renderWallView(){
   if(FLANK>0&&!g.free)[lX,rX].forEach((x0,si)=>{if(sideIn[si])hatch(x0,top,flankPX,hPX);});
 
   // 正視：主牆各段＋柱/管道間正面，依實際位置排列
-  g.fronts.forEach(sg=>drawElevation(sg,mX+sg.px*PX,top,p,PX,wallHmm,wallTP));
+  state._wHits=[];
+  g.fronts.forEach(sg=>{drawElevation(sg,mX+sg.px*PX,top,p,PX,wallHmm,wallTP);state._wHits.push({kind:'seg',seg:sg,X:mX+sg.px*PX,Y:top,w:sg.len,h:wallHmm,PX});});
   const multi=g.fronts.length+g.rets.length>1;
   g.fronts.forEach(sg=>{
     const x0=mX+sg.px*PX,w=sg.len*PX,isC=sg.kind!=='wall';
@@ -2935,7 +3055,7 @@ function renderWallView(){
     let x=(cw-retW)/2;
     g.rets.forEach(sg=>{
       const w=sg.len*PX;
-      drawElevation(sg,x,ry,p,PX,wallHmm,wallTP);
+      drawElevation(sg,x,ry,p,PX,wallHmm,wallTP);state._wHits.push({kind:'seg',seg:sg,X:x,Y:ry,w:sg.len,h:wallHmm,PX});
       ctx.strokeStyle='#1A1916';ctx.lineWidth=1.5;ctx.strokeRect(x,ry,w,hPX);
       ctx.strokeStyle='#F07020';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,ry+hPX);ctx.lineTo(x+w,ry+hPX);ctx.stroke();
       ctx.fillStyle='#2E3B3A';ctx.font='bold 10px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='bottom';
@@ -2945,6 +3065,16 @@ function renderWallView(){
       x+=w+RETGAP;
     });
   }
+  // 各段起鋪點標記
+  state._wHits.forEach(h=>{const o=segOrigin(h.seg,p);drawOrgMark(h.X+o.x*h.PX,h.Y+o.y*h.PX,h.X,h.Y,h.w*h.PX,h.h*h.PX);});
+  drawSnapHover();
+}
+// 起鋪點標記（只畫在該面範圍內）
+function drawOrgMark(x,y,X,Y,W,H){
+  if(x<X-1||x>X+W+1||y<Y-1||y>Y+H+1)return;
+  ctx.save();ctx.strokeStyle='#F07020';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);
+  ctx.beginPath();ctx.moveTo(x-10,y);ctx.lineTo(x+10,y);ctx.moveTo(x,y-10);ctx.lineTo(x,y+10);ctx.stroke();
+  ctx.setLineDash([]);ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fillStyle='#F07020';ctx.fill();ctx.restore();
 }
 
 // ---- UNFOLD VIEW（牛奶盒攤開）----
@@ -3873,6 +4003,17 @@ function hitTestSticker(s,ix,iy,p,d,wtmm){
 }
 
 canvas.addEventListener('mousedown',e=>{
+  if(state.view==='wall'&&state.mode==='origin'){
+    const rc=canvas.getBoundingClientRect(),r=wallSnapAt(e.clientX-rc.left,e.clientY-rc.top);if(!r)return;
+    const x=Math.round(r.x)/10,y=Math.round(r.y)/10;
+    if(r.hit.kind==='seg'){
+      state.wallOrgs=state.wallOrgs||{};state.wallOrgs[r.hit.seg.key]={mode:'custom',x,y};renderWallOrgPanel(true);
+    }else{
+      const s=r.hit.face.s;s.faceOrgs=s.faceOrgs||{};s.faceOrgs[r.hit.face.edge]={x,y};
+      if(s.selected)renderTubOrgs(s);
+    }
+    scheduleRender();return;
+  }
   if(state.view!=='floor')return;
   const rect=canvas.getBoundingClientRect();
   const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
@@ -3881,8 +4022,9 @@ canvas.addEventListener('mousedown',e=>{
   const ix=wmx,iy=wmy;
 
   if(state.mode==='origin'){
-    document.getElementById('originX').value=Math.round(Math.max(0,Math.min(d.iw,(ix-wtmm)/10))*10)/10;
-    document.getElementById('originY').value=Math.round(Math.max(0,Math.min(d.ih,(iy-wtmm)/10))*10)/10;
+    const r=floorSnapAt(cx,cy);if(!r)return;
+    document.getElementById('originX').value=Math.round(r.x)/10;
+    document.getElementById('originY').value=Math.round(r.y)/10;
     scheduleRender();return;
   }
 
@@ -3953,6 +4095,10 @@ canvas.addEventListener('mousedown',e=>{
 });
 
 canvas.addEventListener('mousemove',e=>{
+  if(state.mode==='origin'&&(state.view==='floor'||state.view==='wall')){
+    const rc=canvas.getBoundingClientRect(),cx=e.clientX-rc.left,cy=e.clientY-rc.top;
+    state.snapHover=state.view==='floor'?floorSnapAt(cx,cy):wallSnapAt(cx,cy);scheduleRender();return;
+  }
   if(!state.dragging||state.mode!=='select')return;
   const rect=canvas.getBoundingClientRect();
   const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
@@ -3982,7 +4128,7 @@ canvas.addEventListener('mousemove',e=>{
 });
 
 canvas.addEventListener('mouseup',()=>{state.dragging=null;});
-canvas.addEventListener('mouseleave',()=>{state.dragging=null;});
+canvas.addEventListener('mouseleave',()=>{state.dragging=null;if(state.snapHover){state.snapHover=null;scheduleRender();}});
 
 function zoom(d){if(is3D()){V3.radius=Math.max(30,V3.radius*(d>0?0.8:1.25));draw3D();return;}state.scale=Math.max(0.25,Math.min(5,state.scale+d));document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';scheduleRender();}
 function resetZoom(){
