@@ -167,8 +167,8 @@ canvas{display:block}
     </div>
     <div class="sb-body hidden" id="sbRoom">
     <div class="row" id="rectDims">
-      <div class="field"><label>外牆長</label><input type="number" id="roomW" value="280" min="30" max="2000" oninput="scheduleRender()"></div>
-      <div class="field"><label>外牆寬</label><input type="number" id="roomH" value="180" min="30" max="2000" oninput="scheduleRender()"></div>
+      <div class="field"><label>室內長</label><input type="number" id="roomW" value="260" min="30" max="2000" oninput="scheduleRender()"></div>
+      <div class="field"><label>室內寬</label><input type="number" id="roomH" value="160" min="30" max="2000" oninput="scheduleRender()"></div>
     </div>
     <div class="row">
       <div class="field"><label>牆厚</label><input type="number" id="wallT" value="10" min="0" max="50" oninput="scheduleRender()"></div>
@@ -1071,6 +1071,9 @@ function renderSpacePanel(){
       <div class="field"><label>Y</label><input type="number" step="0.5" value="${o.y}" oninput="setCol(${o.id},'y',this.value)"></div>
       <div class="field"><label>寬</label><input type="number" min="1" step="0.5" value="${o.w}" oninput="setCol(${o.id},'w',this.value)"></div>
       <div class="field"><label>深</label><input type="number" min="1" step="0.5" value="${o.h}" oninput="setCol(${o.id},'h',this.value)"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;margin-top:4px;font-size:11px;color:var(--muted)">靠齊牆面
+      ${[['L','←','靠左牆'],['U','↑','靠上牆'],['D','↓','靠下牆'],['R','→','靠右牆']].map(([k,a,t])=>`<button class="item-btn" style="width:26px;height:22px;font-size:13px" title="${t}" onclick="alignCol(${o.id},'${k}')">${a}</button>`).join('')}
     </div></div>`).join('')||'<div class="info-tip">尚未設定。X、Y 為左上角距淨空間左上角的距離（cm）。</div>';
   addUnits();updateSpaceState();
 }
@@ -1097,6 +1100,24 @@ function addStep(){
 function addCol(type){
   const d=innerDim();const def=OBS_DEF[type];
   state.obstacles.push({id:Date.now(),type,x:0,y:0,w:def.w,h:def.h,label:OBS_LBL[type]+(colObstacles().filter(o=>o.type===type).length+1),color:OBS_COLORS[type]});
+  renderSpacePanel();renderObsList();scheduleRender();
+}
+// 柱子快速靠齊：往指定方向找最近、且與柱子範圍重疊的牆面
+function alignCol(id,dir){
+  const o=state.obstacles.find(o=>o.id===id);if(!o)return;
+  const p=P(),d=innerDim(),ring=buildSpace(p,d,true).segs.filter(g=>g.kind==='wall');
+  const x1=o.x*10,x2=(o.x+o.w)*10,y1=o.y*10,y2=(o.y+o.h)*10,ov=(a,b,c,e)=>Math.min(b,e)-Math.max(a,c)>0.5;
+  let c=null;
+  if(dir==='L'||dir==='R'){
+    const cand=ring.filter(g=>g.axis==='v'&&g.side===(dir==='L'?1:-1)&&ov(g.a,g.b,y1,y2));
+    const pick=dir==='L'?cand.filter(g=>g.c<=x1+1).sort((a,b)=>b.c-a.c)[0]:cand.filter(g=>g.c>=x2-1).sort((a,b)=>a.c-b.c)[0];
+    c=pick?pick.c:(dir==='L'?0:d.iw*10);o.x=Math.round((dir==='L'?c:c-o.w*10))/10;
+  }else{
+    const cand=ring.filter(g=>g.axis==='h'&&g.side===(dir==='U'?1:-1)&&ov(g.a,g.b,x1,x2));
+    const pick=dir==='U'?cand.filter(g=>g.c<=y1+1).sort((a,b)=>b.c-a.c)[0]:cand.filter(g=>g.c>=y2-1).sort((a,b)=>a.c-b.c)[0];
+    c=pick?pick.c:(dir==='U'?0:d.ih*10);o.y=Math.round((dir==='U'?c:c-o.h*10))/10;
+  }
+  o.x=Math.max(0,o.x);o.y=Math.max(0,o.y);
   renderSpacePanel();renderObsList();scheduleRender();
 }
 function setCol(id,f,v){const o=state.obstacles.find(o=>o.id===id);if(!o)return;o[f]=Math.max(f==='w'||f==='h'?1:0,+v||0);renderObsList();scheduleRender();}
@@ -1296,7 +1317,8 @@ function onShapeChange(){
 function numV(id,def){const v=document.getElementById(id).value;return v===''||isNaN(+v)?def:+v;}
 function P(){
   const wt=+document.getElementById('wallT').value||0;
-  let rW=+document.getElementById('roomW').value||280,rH=+document.getElementById('roomH').value||180;
+  // 輸入欄是室內淨尺寸；roomW/roomH 內部仍為含牆厚的外框
+  let rW=(+document.getElementById('roomW').value||260)+wt*2,rH=(+document.getElementById('roomH').value||160)+wt*2;
   if(document.getElementById('roomShape').value==='custom'&&state.space){const cp=customPolygon();rW=cp.w+wt*2;rH=cp.h+wt*2;}
   return {
     roomW:rW,
@@ -1322,7 +1344,7 @@ function P(){
   };
 }
 function innerDim(){const p=P();return{iw:p.roomW-p.wallT*2,ih:p.roomH-p.wallT*2};}
-function updateInnerBadge(){const p=P();const d=innerDim();document.getElementById('innerDimBadge').innerHTML=`淨空間：<span style="font-family:var(--mono);font-weight:500">${d.iw} × ${d.ih} cm</span>`;}
+function updateInnerBadge(){const p=P();const d=innerDim();document.getElementById('innerDimBadge').innerHTML=`含牆厚外框：<span style="font-family:var(--mono);font-weight:500">${p.roomW} × ${p.roomH} cm</span>`;}
 
 // ---- L-SHAPE HELPERS ----
 // Returns the "notch" rectangle in floor (inner) mm coords.
@@ -1922,7 +1944,7 @@ function renderProcList(){
 }
 
 // ---- DRAW FUNCTIONS ----
-const MARGIN=68;
+const MARGIN=82;
 function PXpm(){return state._px||state.scale*0.28;}
 function toCanvas(mmx,mmy){const s=PXpm();return[MARGIN+mmx*s,MARGIN+mmy*s];}
 function toWorld(cx,cy){const s=PXpm();return[(cx-MARGIN)/s,(cy-MARGIN)/s];}
@@ -2245,6 +2267,47 @@ function render(){
   renderFloorView();
 }
 
+// ---- 外圈尺寸標註：每一側一列分段尺寸（牆、柱、管道間的轉折點），下一列為總長 ----
+const DIM_LETTER_OFF=66;
+function drawDimChains(sm,tx,ty,wtmm,outerWmm,outerHmm){
+  const fmt=v=>{const c=Math.round(v)/10;return (Math.round(c*10)/10).toString();};
+  const sides=[
+    {axis:'h',side:1, pos:o=>ty(0)-o, dir:-1},   // 上
+    {axis:'h',side:-1,pos:o=>ty(outerHmm)+o,dir:1}, // 下
+    {axis:'v',side:1, pos:o=>tx(0)-o, dir:-1},   // 左
+    {axis:'v',side:-1,pos:o=>tx(outerWmm)+o,dir:1}, // 右
+  ];
+  ctx.save();
+  sides.forEach(S=>{
+    const segs=sm.segs.filter(g=>g.axis===S.axis&&g.side===S.side);if(!segs.length)return;
+    let pts=[];segs.forEach(g=>pts.push(g.a,g.b));
+    pts=pts.map(v=>Math.round(v)).sort((a,b)=>a-b).filter((v,i,a)=>i===0||v-a[i-1]>2);
+    if(pts.length<2)return;
+    const along=v=>S.axis==='h'?tx(wtmm+v):ty(wtmm+v);
+    const rows=pts.length>2?[{o:16,p:pts},{o:34,p:[pts[0],pts[pts.length-1]]}]:[{o:16,p:pts}];
+    rows.forEach((R,ri)=>{
+      const q=S.pos(R.o),A=along(R.p[0]),B=along(R.p[R.p.length-1]);
+      ctx.strokeStyle='#6E7274';ctx.lineWidth=0.8;ctx.setLineDash([]);
+      const L=(x1,y1,x2,y2)=>{ctx.beginPath();if(S.axis==='h'){ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);}else{ctx.moveTo(y1,x1);ctx.lineTo(y2,x2);}ctx.stroke();};
+      L(A-4,q,B+4,q);
+      R.p.forEach(v=>{const a=along(v);
+        L(a,q-S.dir*5,a,q+S.dir*3);           // 延伸線
+        ctx.lineWidth=1.4;L(a-3,q+3,a+3,q-3);ctx.lineWidth=0.8;}); // 斜短線
+      for(let i=0;i<R.p.length-1;i++){
+        const a=along(R.p[i]),b=along(R.p[i+1]),mid=(a+b)/2,txt=fmt(R.p[i+1]-R.p[i]);
+        let fs=ri?11:10;ctx.font=`${ri?'600 ':''}${fs}px DM Mono,monospace`;
+        let w=ctx.measureText(txt).width;
+        if(w>b-a-2){fs=8;ctx.font=`${fs}px DM Mono,monospace`;w=ctx.measureText(txt).width;}
+        const tight=w>b-a-2,toff=4+(tight&&i%2?9:0);
+        ctx.fillStyle=ri?'#2E3B3A':'#45494B';ctx.textAlign='center';ctx.textBaseline=S.dir<0?'bottom':'top';
+        if(S.axis==='h')ctx.fillText(txt,mid,q+S.dir*toff);
+        else{ctx.save();ctx.translate(q+S.dir*toff,mid);ctx.rotate(-Math.PI/2);ctx.textBaseline='bottom';
+          if(S.dir>0){ctx.rotate(Math.PI);}ctx.fillText(txt,0,0);ctx.restore();}
+      }
+    });
+  });
+  ctx.restore();
+}
 function renderFloorView(){
   const p=P();const d=innerDim();
   updateInnerBadge();
@@ -2443,17 +2506,13 @@ function renderFloorView(){
     else{ctx.moveTo(tx(wtmm+sg.c),ty(wtmm+sg.a));ctx.lineTo(tx(wtmm+sg.c),ty(wtmm+sg.b));}
     ctx.stroke();});
 
-  // Dim labels
-  ctx.fillStyle='#7A776E';ctx.font='11px DM Mono,monospace';
-  ctx.textAlign='center';ctx.textBaseline='top';
-  ctx.fillText(`${d.iw} cm`,tx(outerWmm/2),ty(outerHmm)+8);
-  ctx.save();ctx.translate(tx(0)-14,ty(outerHmm/2));ctx.rotate(-Math.PI/2);
-  ctx.textBaseline='bottom';ctx.fillText(`${d.ih} cm`,0,0);ctx.restore();
+  // 外圈尺寸標註（室內淨尺寸）
+  drawDimChains(sm,tx,ty,wtmm,outerWmm,outerHmm);
 
   // 主牆字母（往牆外側）＋ 同一主牆有多段時，各段小編號
   sm.groups.forEach(g=>{
     const mem=g.fronts.concat(g.rets),multi=mem.length>1;
-    if(g.ring){const r=g.ring,mid=(r.a+r.b)/2,off=wtmm*PX+34;let x,y;
+    if(g.ring){const r=g.ring,mid=(r.a+r.b)/2,edge=r.axis==='h'?(r.c<1||r.c>innerHmm-1):(r.c<1||r.c>innerWmm-1),off=wtmm*PX+(edge?DIM_LETTER_OFF:30);let x,y;
       if(r.axis==='h'){x=tx(wtmm+mid);y=ty(wtmm+r.c)-r.side*off;}else{y=ty(wtmm+mid);x=tx(wtmm+r.c)-r.side*off;}
       ctx.beginPath();ctx.arc(x,y,11,0,Math.PI*2);ctx.fillStyle='#2E3B3A';ctx.fill();
       ctx.fillStyle='#FFF';ctx.font='bold 12px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g.tag,x,y);}
@@ -3967,7 +4026,7 @@ function importJSON(e){
       if(!data.params)throw new Error('格式錯誤');
       const pm=data.params;
       const setV=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;};
-      setV('roomW',pm.roomW);setV('roomH',pm.roomH);setV('wallT',pm.wallT);setV('wallH',pm.wallH);
+      const wt0=+pm.wallT||0;setV('roomW',pm.roomW-wt0*2);setV('roomH',pm.roomH-wt0*2);setV('wallT',pm.wallT);setV('wallH',pm.wallH);
       setV('tileW',pm.tileW/10);setV('tileH',pm.tileH/10);setV('grout',pm.grout);
       setV('layout',pm.layout);setV('waste',pm.waste);
       setV('wallTileW',pm.wallTileW/10);setV('wallTileH',pm.wallTileH/10);setV('wallGrout',pm.wallGrout);
