@@ -4439,7 +4439,7 @@ function build3D(){
   const key=[p.roomW,p.roomH,p.wallT,p.wallH,document.getElementById('roomShape').value,p.lCorner].join(',');
   if(!V3.target||V3.keyRoom!==key){V3.keyRoom=key;reset3DView();}
   if(V3.root){V3.scene.remove(V3.root);dispose3D(V3.root);}
-  const root=new THREE.Group();V3.root=root;V3.scene.add(root);V3.walls=[];V3.attached=[];
+  const root=new THREE.Group();V3.root=root;V3.scene.add(root);V3.walls=[];V3.attached=[];V3.cornerBlocks=[];
   const wallTP={tileW:p.wallTileW,tileH:p.wallTileH,grout:p.wallGrout,layout:p.wallLayout};
   state._wallNums=wallNumbering();
 
@@ -4688,6 +4688,7 @@ function draw3D(){
   const hidden=new Set(V3.walls.filter(w=>!w.mesh.visible).map(w=>w.key));
   // 靠著的牆只要有任一面還顯示，物件就顯示；全部都隱藏才隱藏
   (V3.attached||[]).forEach(a=>{a.obj.visible=!a.walls.length||a.walls.some(k=>!hidden.has(k));});
+  (V3.cornerBlocks||[]).forEach(c=>{const v=ks=>!ks.length||ks.some(k=>!hidden.has(k));c.obj.visible=v(c.a)&&v(c.b);});
   if(V3.placing){const it=findItem(V3.placing.kind,V3.placing.id);const rec=it&&V3.items&&V3.items.get(V3.placing.kind+':'+it.id);if(rec&&!it._seen)rec.obj.visible=false;}
   V3.renderer.render(V3.scene,cam);
   document.getElementById('zoomLbl').textContent='3D';
@@ -4888,32 +4889,41 @@ function makeMirrorCab3D(s,dp){
 }
 
 // ---- 3D：牆厚 ----
+// 牆本身（室內角到室內角）跟著該面牆隱藏；陰角延伸出去的轉角方塊，要兩面牆都顯示才顯示（隱藏時像被切掉）
 function addWallThickness3D(root,sm,p,H){
   const wt=p.wallT*10;if(!(wt>0))return;
   const ring=sm.ring||sm,segsAll=wallSegs(p,innerDim());
   const CAP=0x7C8082,END=0x9A9EA0;
   const mat=c=>new THREE.MeshBasicMaterial({color:c,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+  const keysOf=r=>segsAll.filter(w=>w.kind==='wall'&&w.axis===r.axis&&w.side===r.side&&Math.abs(w.c-r.c)<1).map(w=>w.key);
+  const T=wt/10;
+  V3.cornerBlocks=V3.cornerBlocks||[];
   ring.segs.filter(s=>s.kind==='wall').forEach(s=>{
     const ca=s.axis==='h'?ring.corner(s.a,s.c):ring.corner(s.c,s.a),cb=s.axis==='h'?ring.corner(s.b,s.c):ring.corner(s.c,s.b);
-    const a=(s.a-(ca==='in'?wt:0))/10,b=(s.b+(cb==='in'?wt:0))/10,T=wt/10,L=b-a;if(L<=0)return;
-    const c0=(s.side>0?s.c-wt:s.c)/10; // 牆外側邊界（較小那側）
-    const g=new THREE.Group();
-    const add=(geo,col,x,y,z)=>{const m=new THREE.Mesh(geo,mat(col));m.position.set(x,y,z);m.add(edgeLines(geo,0x2B2F31,0.9));g.add(m);};
-    // 陰角延伸出去的那段（轉角方塊）朝室內那面也補上，隱藏相鄰牆時才不會看穿
-    const ext=[];if(ca==='in')ext.push(a+T/2);if(cb==='in')ext.push(b-T/2);
-    const ci=s.c/10;
-    if(s.axis==='h'){
-      const top=new THREE.PlaneGeometry(L,T);top.rotateX(-Math.PI/2);add(top,CAP,a+L/2,H,c0+T/2);
-      [a,b].forEach(x=>{const e=new THREE.PlaneGeometry(T,H);e.rotateY(Math.PI/2);add(e,END,x,H/2,c0+T/2);});
-      ext.forEach(x=>add(new THREE.PlaneGeometry(T,H),END,x,H/2,ci));
-    } else {
-      const top=new THREE.PlaneGeometry(T,L);top.rotateX(-Math.PI/2);add(top,CAP,c0+T/2,H,a+L/2);
-      [a,b].forEach(z=>{const e=new THREE.PlaneGeometry(T,H);add(e,END,c0+T/2,H/2,z);});
-      ext.forEach(z=>{const e=new THREE.PlaneGeometry(T,H);e.rotateY(Math.PI/2);add(e,END,ci,H/2,z);});
-    }
-    root.add(g);
-    const keys=segsAll.filter(w=>w.kind==='wall'&&w.axis===s.axis&&w.side===s.side&&Math.abs(w.c-s.c)<1).map(w=>w.key);
-    V3.attached.push({obj:g,walls:keys});
+    const a=s.a/10,b=s.b/10,L=b-a;if(L<=0)return;
+    const c0=(s.side>0?s.c-wt:s.c)/10,ci=s.c/10,mine=keysOf(s);
+    const box=(g,u0,u1,ends,innerFace)=>{ // 沿牆 u0..u1 的一段實心牆厚
+      const add=(geo,col,x,y,z)=>{const m=new THREE.Mesh(geo,mat(col));m.position.set(x,y,z);m.add(edgeLines(geo,0x2B2F31,0.9));g.add(m);};
+      const Lu=u1-u0,um=(u0+u1)/2;
+      if(s.axis==='h'){
+        const top=new THREE.PlaneGeometry(Lu,T);top.rotateX(-Math.PI/2);add(top,CAP,um,H,c0+T/2);
+        ends.forEach(x=>{const e=new THREE.PlaneGeometry(T,H);e.rotateY(Math.PI/2);add(e,END,x,H/2,c0+T/2);});
+        if(innerFace)add(new THREE.PlaneGeometry(Lu,H),END,um,H/2,ci);
+      } else {
+        const top=new THREE.PlaneGeometry(T,Lu);top.rotateX(-Math.PI/2);add(top,CAP,c0+T/2,H,um);
+        ends.forEach(z=>add(new THREE.PlaneGeometry(T,H),END,c0+T/2,H/2,z));
+        if(innerFace){const e=new THREE.PlaneGeometry(Lu,H);e.rotateY(Math.PI/2);add(e,END,ci,H/2,um);}
+      }
+    };
+    const g=new THREE.Group();box(g,a,b,[a,b],false);root.add(g);
+    V3.attached.push({obj:g,walls:mine});
+    // 轉角方塊
+    [[ca,s.a,a-T],[cb,s.b,b+T]].forEach(([cn,at,far])=>{
+      if(cn!=='in')return;
+      const adj=ring.segs.find(r=>r!==s&&r.kind==='wall'&&r.axis!==s.axis&&Math.abs(r.c-at)<1&&(Math.abs(r.a-s.c)<1||Math.abs(r.b-s.c)<1));
+      const cg=new THREE.Group();box(cg,Math.min(at/10,far),Math.max(at/10,far),[far],true);root.add(cg);
+      V3.cornerBlocks.push({obj:cg,a:mine,b:adj?keysOf(adj):[]});
+    });
   });
 }
 // ---- 3D：窗洞收邊（窗框內退，四周側面貼磚，窗在內退處）----
