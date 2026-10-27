@@ -1653,18 +1653,20 @@ function orgRaw(id){
   const p=P();
   if(id==='floor'){
     if(state.floorOrg)return{...state.floorOrg};
-    return{ax:(+document.getElementById('originX').value||0)*10,ay:(+document.getElementById('originY').value||0)*10,q:'se',dx:0,dy:0,lbl:'自訂座標'};
+    const ax=(+document.getElementById('originX').value||0)*10,ay=(+document.getElementById('originY').value||0)*10,d=innerDim();
+    return{ax,ay,q:smartQ(d.iw*10,d.ih*10,ax,ay),dx:0,dy:0,lbl:'自訂座標'};
   }
   const [k,a,b]=id.split(':');
   if(k==='seg'){
     const o=(state.wallOrgs||{})[a]||{};if(o.mode==='anchor'&&o.ax!=null)return{...o};
     const sg=getSeg(a);const og=sg?segOrigin(sg,p):{x:0,y:0};
     const ML={auto:'自動',left:'左端起磚',right:'右端起磚',center:'置中',custom:'自訂座標'};
-    return{ax:og.x,ay:og.y,q:'se',dx:0,dy:0,lbl:ML[o.mode||'auto']||'自動'};
+    return{ax:og.x,ay:og.y,q:sg?smartQ(sg.len,p.wallH*10,og.x,og.y):'se',dx:0,dy:0,lbl:ML[o.mode||'auto']||'自動'};
   }
   const t=state.stickers.find(x=>String(x.id)===a);const o=t&&(t.faceOrgs||{})[b];
   if(o&&o.ax!=null)return{...o};
-  return{ax:((o&&o.x)||0)*10,ay:((o&&o.y)||0)*10,q:'se',dx:0,dy:0,lbl:'左上角'};
+  const ax=((o&&o.x)||0)*10,ay=((o&&o.y)||0)*10,f=tubFaces().find(f=>String(f.s.id)===a&&f.edge===b);
+  return{ax,ay,q:f?smartQ(f.w,f.h,ax,ay):'se',dx:0,dy:0,lbl:o?'自訂座標':'左上角'};
 }
 function orgStore(id,o){
   o={ax:Math.round(o.ax),ay:Math.round(o.ay),q:o.q||'se',dx:Math.round((o.dx||0)*10)/10,dy:Math.round((o.dy||0)*10)/10,lbl:o.lbl||''};
@@ -1710,7 +1712,7 @@ function floorSideTag(side){
 let _obSig='';
 function updateOrgBar(force){
   const bar=document.getElementById('orgBar');if(!bar)return;
-  const show=state.spaceDone&&(state.view==='floor'||state.view==='wall');
+  const show=state.spaceDone&&(state.view==='floor'||state.view==='wall')&&state.mode==='origin';
   bar.style.display=show?'flex':'none';if(!show)return;
   const fs=orgBarFaces();if(!fs.length)return;
   if(!fs.some(f=>f.id===state.orgSel))state.orgSel=fs[0].id;
@@ -1721,7 +1723,7 @@ function updateOrgBar(force){
   const o=orgRaw(state.orgSel);
   document.getElementById('obBase').innerHTML=`基準：<b style="color:#C2560F">${o.lbl||'—'}</b>`+(fs.length>1?'':`<span style="color:var(--muted)">（${sf.tag}）</span>`);
   document.querySelectorAll('#obQuad .obq').forEach(b=>b.classList.toggle('on',b.dataset.q===(o.q||'se')));
-  document.getElementById('obInfo').textContent=orgDescribe(state.orgSel,o,sf)+(state.mode==='origin'?'':'　（按「設定起鋪點」後在圖上點選基準點）');
+  document.getElementById('obInfo').textContent=orgDescribe(state.orgSel,o,sf)+'　（在圖上點選可換基準點）';
   const rb=document.getElementById('obRot'),pt=state.orgSel.split(':');
   if(pt[0]==='tub'){const t=state.stickers.find(x=>String(x.id)===pt[1]);if(t){rb.style.display='';rb.textContent='⟳ 磚向 '+tubRotLbl(t,pt[2]);}}else rb.style.display='none';
 }
@@ -1729,6 +1731,19 @@ function updateOrgBar(force){
 function drawFirstTile(X0,Y0,PX,o,tw,th,W,H,strong){
   const a={x:o.ax!=null?o.ax:(o.x||0)*10,y:o.ay!=null?o.ay:(o.y||0)*10},pt=o.ax!=null?anchorPt(o):a,org=anchorOrigin(o,tw,th);
   const cx=v=>X0+v*PX,cy=v=>Y0+v*PX;
+  if(state.mode!=='origin'){
+    // 檢視模式：只畫起鋪點圓點＋簡短資訊
+    const x=cx(pt.x),y=cy(pt.y);if(x<X0-2||x>X0+W*PX+2||y<Y0-2||y>Y0+H*PX+2)return;
+    const QL={ne:'右上',nw:'左上',se:'右下',sw:'左下'},q=o.q||'se';
+    const t=(o.lbl?o.lbl+'・':'')+'整磚'+QL[q]+((o.dx||o.dy)?'・偏移':'');
+    ctx.save();ctx.font='10px Noto Sans TC,DM Mono,sans-serif';const tw2=ctx.measureText(t).width+8;
+    let bx=q[1]==='w'?x-8-tw2:x+8,by=q[0]==='n'?y-20:y+6;
+    bx=Math.max(X0+1,Math.min(bx,X0+W*PX-tw2-1));by=Math.max(Y0+1,Math.min(by,Y0+H*PX-15));
+    ctx.fillStyle='rgba(255,255,255,.88)';ctx.fillRect(bx,by,tw2,14);ctx.strokeStyle='#F07020';ctx.lineWidth=0.8;ctx.strokeRect(bx,by,tw2,14);
+    ctx.fillStyle='#9A3D00';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,bx+4,by+7.5);
+    ctx.beginPath();ctx.arc(x,y,4.5,0,Math.PI*2);ctx.fillStyle='#F07020';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();
+    ctx.restore();return;
+  }
   ctx.save();
   ctx.beginPath();ctx.rect(X0,Y0,W*PX,H*PX);ctx.clip();
   ctx.fillStyle=strong?'rgba(240,112,32,.22)':'rgba(240,112,32,.10)';ctx.fillRect(cx(org.x),cy(org.y),tw*PX,th*PX);
