@@ -670,7 +670,8 @@ canvas{display:block}
 <!-- 空間設定（覆蓋在編輯畫面前） -->
 <div id="spaceOverlay" class="space-ov hidden">
   <div class="space-card">
-    <div class="space-head"><b>空間設定</b><span>設定外形、牆厚、壁高與柱／管道間，完成後進入 3D 編輯畫面</span></div>
+    <div class="space-head" style="display:flex;align-items:center;gap:10px"><b>空間設定</b><span>設定外形、牆厚、壁高與柱／管道間，完成後進入 3D 編輯畫面</span>
+      <label class="btn btn-sm" style="cursor:pointer;margin-left:auto;white-space:nowrap" title="載入之前儲存的 JSON 檔，直接進入編輯">📂 載入檔案繼續編輯<input type="file" accept=".json" style="display:none" onchange="importJSON(event);this.value=''"></label></div>
     <div class="space-body">
       <div class="space-form" id="spaceFormHost"></div>
       <div class="space-preview" id="spacePreview"><canvas id="spaceCanvas"></canvas></div>
@@ -2486,7 +2487,8 @@ function drawDimChains(sm,tx,ty,wtmm,outerWmm,outerHmm){
     rows.forEach(R=>{
       const q=S.pos(R.o),A=along(R.p[0]),B=along(R.p[R.p.length-1]);
       L(A,q,B,q);                                   // 尺寸線
-      R.p.forEach(v=>{const a=along(v);L(a,S.pos(4),a,q+S.dir*EXT);}); // 延伸線：從牆邊拉到尺寸線外
+      R.p.forEach(v=>{const a=along(v);L(a,S.pos(4),a,q+S.dir*EXT);   // 延伸線：從牆邊拉到尺寸線外
+        ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo((S.axis==='h'?a:q)-3.5,(S.axis==='h'?q:a)+3.5);ctx.lineTo((S.axis==='h'?a:q)+3.5,(S.axis==='h'?q:a)-3.5);ctx.stroke();ctx.lineWidth=0.8;}); // 建築斜線
       ctx.fillStyle=COL;
       R.labels.forEach((txt,i)=>{
         const a=along(R.p[i]),b=along(R.p[i+1]),mid=(a+b)/2,w=ctx.measureText(txt).width;
