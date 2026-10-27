@@ -520,6 +520,7 @@ canvas{display:block}
 <div class="modal-overlay hidden" id="summaryModal" onclick="if(event.target===this)closeSummaryModal()">
   <div class="modal">
     <div class="modal-title">磚量統計</div>
+    <div id="mConflicts"></div>
     <div class="sum-grid">
     <div class="sum-col">
     <!-- 地磚 -->
@@ -749,6 +750,11 @@ canvas{display:block}
     <div style="display:flex;gap:12px;margin-left:auto;align-items:center">
       <div class="li"><div class="ls" style="background:#E8E4DC"></div>整磚</div>
       <div class="li" id="cutLegend"><div class="ls" style="background:#F0E6C8"></div>裁切</div>
+      <span id="tubMsg" style="display:none;align-items:center;padding:3px 8px;border-radius:4px;background:#FDECEA;color:#B3261E;font-size:12px">浴缸必須在室內，已移回</span>
+      <div class="disp-menu">
+        <button class="btn btn-sm" id="cfBtn" style="display:none;background:#FFF4E5;border-color:#E8B37A;color:#8A4B0F" onclick="event.stopPropagation();document.getElementById('cfPop').classList.toggle('open')"></button>
+        <div class="disp-pop" id="cfPop" style="min-width:300px;max-width:380px" onclick="event.stopPropagation()"><div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px">需要注意的地方（不影響磚量計算）</div><div id="cfList"></div></div>
+      </div>
       <div class="disp-menu" id="dispMenu">
         <button class="btn btn-sm" onclick="event.stopPropagation();document.getElementById('dispPop').classList.toggle('open')">顯示項目 ▾</button>
         <div class="disp-pop" id="dispPop" onclick="event.stopPropagation()">
@@ -843,7 +849,7 @@ let renderTimer=null;
 // 磚面顏色：可切換是否標示裁切磚
 function tileFill(isPartial){return isPartial&&state.showCut!==false?'#F0E6C8':'#E8E4DC';}
 function toggleShowDims(on){state.showDims=on;scheduleRender();}
-document.addEventListener('click',()=>{const p=document.getElementById('dispPop');if(p)p.classList.remove('open');});
+document.addEventListener('click',()=>{['dispPop','cfPop'].forEach(id=>{const p=document.getElementById(id);if(p)p.classList.remove('open');});});
 function toggleShowNum(on){state.showNum=on;scheduleRender();}
 function toggleShowCut(on){state.showCut=on;const l=document.getElementById('cutLegend');if(l)l.style.opacity=on?1:0.35;scheduleRender();}
 const DECOR_TYPES=new Set(['toilet','bathroomCab','mirrorCab','freeTub']);
@@ -2618,7 +2624,84 @@ function getLayoutOffset(col,row,tp,thp,layout){
   return[0,0];
 }
 
+// 浴缸必須完全在室內（柱、管道間範圍可以，室外／缺角不行）
+function tubInside(s){
+  const d=innerDim(),sm=spaceModel(),r=stkFootprint(s);
+  if(r.x1<-1||r.y1<-1||r.x2>d.iw*10+1||r.y2>d.ih*10+1)return false;
+  const ok=(x,y)=>sm.floorRects.some(q=>x>=q.x1-0.5&&x<=q.x2+0.5&&y>=q.y1-0.5&&y<=q.y2+0.5)||sm.cols.some(q=>x>=q.x1-0.5&&x<=q.x2+0.5&&y>=q.y1-0.5&&y<=q.y2+0.5);
+  const pts=(a,b)=>{const o=[];for(let v=a+2;v<b-2;v+=40)o.push(v);o.push(b-2);return o;};
+  const X=pts(r.x1,r.x2),Y=pts(r.y1,r.y2);
+  for(const x of X)for(const y of Y)if(!ok(x,y))return false;
+  return true;
+}
+function enforceTubInside(){
+  if(!state.spaceDone)return;
+  const d=innerDim();
+  state.stickers.filter(t=>t.type==='bathtub'&&!t._placing).forEach(t=>{
+    if(tubInside(t)){t._ok={x:t.x,y:t.y,w:t.w,h:t.h,rot:t.rot||0};t._out=false;return;}
+    const prev={x:t.x,y:t.y,w:t.w,h:t.h,rot:t.rot};
+    if(t._ok){Object.assign(t,t._ok);if(tubInside(t)){showTubMsg();return;}Object.assign(t,prev);}
+    // 夾回房間範圍內再試一次
+    const r=stkFootprint(t);
+    if(r.x1<0)t.x-=r.x1/10;if(r.y1<0)t.y-=r.y1/10;
+    if(r.x2>d.iw*10)t.x-=(r.x2-d.iw*10)/10;if(r.y2>d.ih*10)t.y-=(r.y2-d.ih*10)/10;
+    t.x=Math.round(t.x*10)/10;t.y=Math.round(t.y*10)/10;
+    t._out=!tubInside(t);if(!t._out){t._ok={x:t.x,y:t.y,w:t.w,h:t.h,rot:t.rot||0};}
+    showTubMsg();
+  });
+}
+function showTubMsg(){
+  const el=document.getElementById('tubMsg');if(!el)return;
+  el.style.display='inline-flex';clearTimeout(showTubMsg._t);showTubMsg._t=setTimeout(()=>el.style.display='none',2500);
+}
+// ===== 4. 衝突提醒 =====
+function computeConflicts(){
+  const out=[];if(!state.spaceDone)return out;
+  const p=P(),d=innerDim(),H=p.wallH*10;
+  // 門的開門範圍（往室內，深度＝門寬）
+  state.obstacles.filter(o=>o.type==='door').forEach(o=>{
+    const seg=getSeg(o.wall||defaultWallKey());const mm=wallObsToInnerMM(o,p,d);if(!seg||!mm)return;
+    const dw=o.w*10;
+    const zone=seg.axis==='h'?{x1:mm.x,x2:mm.x+mm.w,y1:seg.side>0?seg.c:seg.c-dw,y2:seg.side>0?seg.c+dw:seg.c}
+                             :{y1:mm.y,y2:mm.y+mm.h,x1:seg.side>0?seg.c:seg.c-dw,x2:seg.side>0?seg.c+dw:seg.c};
+    state.stickers.filter(s=>!s.wallOnly&&!s._placing&&stkShown(s)&&['bathtub','freeTub','toilet','bathroomCab'].includes(s.type)).forEach(s=>{
+      const r=stkFootprint(s);
+      if(r.x1<zone.x2-1&&r.x2>zone.x1+1&&r.y1<zone.y2-1&&r.y2>zone.y1+1)
+        out.push({lvl:'warn',msg:`${s.label} 在「${o.label||'門'}」的開門範圍內，門可能打不開`});
+    });
+  });
+  // 窗台低於缸緣
+  state.stickers.filter(s=>s.type==='bathtub'&&!s._placing).forEach(s=>{
+    wallSegs(p,d).forEach(seg=>{
+      const ex=wallObsExclusions(seg.key,seg.len,H),tub=ex.filter(e=>e.type==='tub');
+      ex.filter(e=>e.type==='window').forEach(w=>{
+        if(tub.some(t=>t.x1<w.x2-1&&t.x2>w.x1+1&&w.y2>t.y1+1))
+          out.push({lvl:'warn',msg:`${seg.tag} 牆的「${w.label||'窗'}」窗台離地 ${Math.round((H-w.y2)/10*10)/10} cm，低於${s.label}缸緣 ${stkHeight(s)} cm`});
+      });
+    });
+    if(s._out)out.push({lvl:'err',msg:`${s.label} 超出室內範圍，請移回室內`});
+  });
+  // 分段線穿過門窗
+  Object.entries(state.faceTiles||{}).forEach(([id,c])=>{
+    if(!c.split)return;const b=faceBase(id);if(!b)return;const y=b.h-(+c.splitH||0)*10;
+    const nm=b.seg?(b.seg.tag+' 牆'):b.tub.label;
+    b.excl.forEach(e=>{if((e.type==='door'||e.type==='window')&&e.y1<y-1&&e.y2>y+1)
+      out.push({lvl:'warn',msg:`${nm} 的分段線（離地 ${c.splitH} cm）從「${e.label||(e.type==='door'?'門':'窗')}」中間穿過`});});
+  });
+  // 柱子離牆太近
+  colObstacles().forEach(o=>{const g=colWallGaps(o),N={L:'左',R:'右',U:'上',D:'下'};
+    Object.entries(g).forEach(([k,v])=>{if(v!=null&&v>0.5&&v<30)out.push({lvl:'warn',msg:`${o.label} 距${N[k]}牆只有 ${Math.round(v)/10} cm，會多出很窄的牆面`});});});
+  return out;
+}
+function updateConflicts(){
+  const list=computeConflicts();state._conflicts=list;
+  const b=document.getElementById('cfBtn');if(!b)return;
+  b.style.display=list.length?'':'none';
+  b.textContent=`⚠ 衝突 ${list.length}`;
+  document.getElementById('cfList').innerHTML=list.map(c=>`<div style="padding:5px 2px;border-bottom:1px solid var(--border);font-size:12px;color:${c.lvl==='err'?'#B3261E':'#8A4B0F'};white-space:normal">• ${c.msg}</div>`).join('');
+}
 function render(){
+  enforceTubInside();updateConflicts();
   if(state.space&&!state.spaceDone&&document.getElementById('spaceCanvas')){renderSpacePreview();return;}
   if(state.view==='wall'){renderWallView();return;}
   if(state.view==='unfold'){
@@ -3071,6 +3154,26 @@ function tubExposedEdges(s){
   return TUB_EDGES.filter(e=>!tubEdgeAgainst(r,e)&&!(s.apronOff&&s.apronOff[e]));
 }
 function tubDeckOn(s){return s.deckTile!==false;}
+// 檯面範圍內的柱、管道間：不貼磚（檯面座標 mm）
+// 半牆只砌在室內剩餘空間：與柱、管道間重疊的那段扣除（半牆面座標 mm，從外面看由左到右）
+function tubApronCols(s,r,e,Hmm){
+  const t=tubApronT(s)*10,out=[];
+  const band=e==='n'?{x1:r.x1,x2:r.x2,y1:r.y1,y2:r.y1+t}:e==='s'?{x1:r.x1,x2:r.x2,y1:r.y2-t,y2:r.y2}:e==='w'?{x1:r.x1,x2:r.x1+t,y1:r.y1,y2:r.y2}:{x1:r.x2-t,x2:r.x2,y1:r.y1,y2:r.y2};
+  spaceModel().cols.forEach(c=>{
+    if(!(c.x1<band.x2-0.5&&c.x2>band.x1+0.5&&c.y1<band.y2-0.5&&c.y2>band.y1+0.5))return;
+    let a,b;
+    if(e==='n'){a=r.x2-Math.min(c.x2,r.x2);b=r.x2-Math.max(c.x1,r.x1);}
+    else if(e==='s'){a=Math.max(c.x1,r.x1)-r.x1;b=Math.min(c.x2,r.x2)-r.x1;}
+    else if(e==='w'){a=Math.max(c.y1,r.y1)-r.y1;b=Math.min(c.y2,r.y2)-r.y1;}
+    else{a=r.y2-Math.min(c.y2,r.y2);b=r.y2-Math.max(c.y1,r.y1);}
+    if(b-a>1)out.push({x1:a,x2:b,y1:0,y2:Hmm,type:'col'});
+  });
+  return out;
+}
+function tubDeckCols(r){
+  return spaceModel().cols.map(c=>({x1:Math.max(c.x1,r.x1),y1:Math.max(c.y1,r.y1),x2:Math.min(c.x2,r.x2),y2:Math.min(c.y2,r.y2),type:'col'}))
+    .filter(c=>c.x2-c.x1>1&&c.y2-c.y1>1).map(c=>({x1:c.x1-r.x1,y1:c.y1-r.y1,x2:c.x2-r.x1,y2:c.y2-r.y1,type:'col'}));
+}
 // 浴缸各面磚向：轉 90° 時長寬對調
 function tubFaceRot(s,k){return !!(s.faceRot&&s.faceRot[k]);}
 function tubFaceSpec(s,k,spec){return tubFaceRot(s,k)?{...spec,tileW:spec.tileH,tileH:spec.tileW}:spec;}
@@ -3087,13 +3190,13 @@ function tubFaces(){
     tubExposedEdges(s).forEach(e=>{
       const w=(e==='n'||e==='s')?r.x2-r.x1:r.y2-r.y1;
       const og=(s.faceOrgs||{})[e],fsp=tubFaceSpec(s,e,spec),oo=anchorOrigin(og,fsp.tileW,fsp.tileH);
-      out.push({kind:'apron',s,edge:e,label:`${s.label}・半牆 ${TUB_EDGE_LBL[e]}`,w,h:Hmm,excl:[],spec:fsp,baseSpec:spec,ox:oo.x,oy:oo.y,org:og});
+      out.push({kind:'apron',s,edge:e,label:`${s.label}・半牆 ${TUB_EDGE_LBL[e]}`,w,h:Hmm,excl:tubApronCols(s,r,e,Hmm),spec:fsp,baseSpec:spec,ox:oo.x,oy:oo.y,org:og});
     });
     if(tubDeckOn(s)){
       // 檯面（平面方向，上 = A 側）：挖掉缸口
       const h=tubHole(s);
       const og=(s.faceOrgs||{}).deck,fsp=tubFaceSpec(s,'deck',spec),oo=anchorOrigin(og,fsp.tileW,fsp.tileH);
-      out.push({kind:'deck',s,edge:'deck',label:`${s.label}・檯面`,w:r.x2-r.x1,h:r.y2-r.y1,excl:[{x1:h.x1-r.x1,y1:h.y1-r.y1,x2:h.x2-r.x1,y2:h.y2-r.y1,type:'tubHole'}],spec:fsp,baseSpec:spec,ox:oo.x,oy:oo.y,org:og});
+      out.push({kind:'deck',s,edge:'deck',label:`${s.label}・檯面`,w:r.x2-r.x1,h:r.y2-r.y1,excl:[{x1:h.x1-r.x1,y1:h.y1-r.y1,x2:h.x2-r.x1,y2:h.y2-r.y1,type:'tubHole'}].concat(tubDeckCols(r)),spec:fsp,baseSpec:spec,ox:oo.x,oy:oo.y,org:og});
     }
   });
   return out;
@@ -3151,7 +3254,7 @@ function drawDeckOnFloor(tx,ty,wtmm,PX){
   tubFaces().filter(f=>f.kind==='deck').forEach(f=>{
     const r=stkFootprint(f.s),X=tx(wtmm+r.x1),Y=ty(wtmm+r.y1),h=f.excl[0];
     ctx.save();
-    ctx.beginPath();ctx.rect(X,Y,f.w*PX,f.h*PX);ctx.rect(X+h.x1*PX,Y+h.y1*PX,(h.x2-h.x1)*PX,(h.y2-h.y1)*PX);ctx.clip('evenodd');
+    ctx.beginPath();ctx.rect(X,Y,f.w*PX,f.h*PX);f.excl.forEach(e=>ctx.rect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX));ctx.clip('evenodd');
     {const id='tub:'+f.s.id+':deck',fb=faceBase(id);if(fb)drawFacePieces(X,Y,fb,facePieces(id,fb),nums[id]);}
     ctx.restore();
     ctx.save();ctx.strokeStyle='#2B2F31';ctx.lineWidth=1.4;ctx.setLineDash([]);ctx.strokeRect(X,Y,f.w*PX,f.h*PX);
@@ -3164,8 +3267,9 @@ function drawTubFaceSurface(f,X,Y,PX){
   const id='tub:'+f.s.id+':'+f.edge,lb=state.showNum!==false&&state._wallNums?state._wallNums[id]:null;
   const fb=faceBase(id);if(fb)drawFacePieces(X,Y,fb,facePieces(id,fb),lb);
   f.excl.forEach(e=>{
-    ctx.fillStyle='#F7F7F5';ctx.fillRect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX);
-    ctx.strokeStyle='#8BB4D4';ctx.lineWidth=1.2;ctx.strokeRect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX);
+    const col=e.type==='col';
+    ctx.fillStyle=col?'#5E6264':'#F7F7F5';ctx.fillRect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX);
+    ctx.strokeStyle=col?'#2B2F31':'#8BB4D4';ctx.lineWidth=1.2;ctx.strokeRect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX);
   });
 }
 // 壁磚圖：浴缸半牆 / 檯面
@@ -4907,6 +5011,7 @@ function showSummaryModal(){
       <div class="modal-stat" style="grid-column:span 2"><div class="modal-stat-l">建議叫貨</div><div class="modal-stat-v" style="color:var(--accent)">${t.order}</div><div class="modal-stat-u">片</div></div>
     </div>
     <div class="modal-note">${t.spec.name} ${t.spec.tileW/10}×${t.spec.tileH/10} cm，未併入上方${t.spec.name}數量；同規格請相加叫貨（${t.spec.name}合計約 ${t.order+(t.spec.key==='wall'?wr.order:(+document.getElementById('mStatOrder').textContent||0))} 片）。</div></div>`).join('');
+  {const cf=state._conflicts||[];document.getElementById('mConflicts').innerHTML=cf.length?`<div style="background:#FFF4E5;border:1px solid #E8B37A;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#8A4B0F"><b>⚠ 需要注意（${cf.length}）</b>${cf.map(c=>`<div style="margin-top:3px">• ${c.msg}</div>`).join('')}</div>`:'';}
   // 特殊磚
   const G=tileGroupStats(),lnm={straight:'平貼',half:'1/2交丁（橫）',third:'1/3交丁（橫）','half-v':'1/2交丁（直）'};
   const faceName=id=>{const[k,a,b]=id.split(':');if(k==='seg'){const sg=getSeg(a);return sg?sg.tag:a;}return b==='deck'?'浴缸檯面':'半牆'+(TUB_EDGE_LBL[b]||'');};
