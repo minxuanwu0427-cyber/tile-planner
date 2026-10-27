@@ -701,11 +701,14 @@ canvas{display:block}
 <!-- 空間設定（覆蓋在編輯畫面前） -->
 <div id="spaceOverlay" class="space-ov hidden">
   <div class="space-card">
-    <div class="space-head" style="display:flex;align-items:center;gap:10px"><b>空間設定</b><span>設定外形、牆厚、壁高與柱／管道間，完成後進入 3D 編輯畫面</span>
-      <label class="btn btn-sm" style="cursor:pointer;margin-left:auto;white-space:nowrap" title="載入之前儲存的 JSON 檔，直接進入編輯">📂 載入檔案繼續編輯<input type="file" accept=".json" style="display:none" onchange="importJSON(event);this.value=''"></label></div>
+    <div class="space-head"><b>空間設定</b><span>設定外形、牆厚、壁高與柱／管道間，完成後進入 3D 編輯畫面</span></div>
     <div class="space-body">
       <div class="space-form" id="spaceFormHost"></div>
       <div class="space-preview" id="spacePreview"><canvas id="spaceCanvas"></canvas></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 18px;border-top:1px solid var(--border)">
+      <label class="btn btn-sm" style="cursor:pointer;white-space:nowrap" title="載入之前儲存的 JSON 檔，直接進入編輯">載入檔案繼續編輯<input type="file" accept=".json" style="display:none" onchange="importJSON(event);this.value=''"></label>
+      <span style="font-size:11px;color:var(--muted)">已有存檔時可直接載入，跳過空間設定</span>
     </div>
   </div>
 </div>
@@ -4258,6 +4261,14 @@ function init3D(){
   };
   el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
   el.addEventListener('pointerleave',()=>{if(V3.placing&&!V3.ptrs.size){const it=findItem(V3.placing.kind,V3.placing.id);const rec=it&&V3.items.get(V3.placing.kind+':'+it.id);if(rec){rec.obj.visible=false;it._seen=false;draw3D();}}});
+  el.addEventListener('dblclick',e=>{
+    setRay(e);V3.scene.updateMatrixWorld();
+    const sps=V3.walls.filter(w=>w.sp&&w.sp.visible&&worldVisible(w.sp)).map(w=>w.sp);
+    const h=_ray.intersectObjects(sps,false)[0];if(!h)return;
+    const w=V3.walls.find(w=>w.sp===h.object);if(!w)return;
+    const fs=allWallFaces(),idx=fs.findIndex(f=>f.kind==='wall'&&f.group.fronts.concat(f.group.rets).some(t=>t.key===w.key));if(idx<0)return;
+    state.wallFace=idx;state.orgSel='seg:'+w.key;setView('wall');updateWallFaceLbl();
+  });
   el.addEventListener('wheel',e=>{
     e.preventDefault();
     V3.radius=Math.max(30,Math.min(20000,V3.radius*Math.exp(e.deltaY*0.0012)));
