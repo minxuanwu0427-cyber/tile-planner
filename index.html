@@ -2752,16 +2752,14 @@ function renderFloorView(){
   // Draw tiles — clipped to floor area
   ctx.save();ctx.beginPath();
   sm.floorRects.forEach(r=>ctx.rect(tx(wtmm+r.x1),ty(wtmm+r.y1),(r.x2-r.x1)*PX,(r.y2-r.y1)*PX));ctx.clip();
+  const fObs=floorObstacles(p,d);
   state._tiles.forEach(tile=>{
     ctx.fillStyle=tileFill(tile.isPartial);
     ctx.fillRect(tile.px,tile.py,tile.pw,tile.ph);
     ctx.strokeStyle='#C0BCB4';ctx.lineWidth=0.5;ctx.strokeRect(tile.px+.5,tile.py+.5,tile.pw-1,tile.ph-1);
-    if(state.showNum!==false&&tile.pw>16&&tile.ph>10){
-      ctx.fillStyle=tile.isPartial&&state.showCut!==false?'#8B5E3C':'#8A8780';
-      const fs=Math.min(10,Math.min(tile.pw,tile.ph)*.32);
-      ctx.font=`${fs}px DM Mono,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(tile.label,tile.px+tile.pw/2,tile.py+tile.ph/2);
-    }
+  });
+  if(state.showNum!==false)state._tiles.forEach(tile=>{
+    drawTileLabel(tile.label,{x:tile.x,y:tile.y,cw:tile.w,ch:tile.h},tx(wtmm),ty(wtmm),PX,fObs,tile.isPartial&&state.showCut!==false?'#8B5E3C':'#8A8780');
   });
   ctx.restore();
 
@@ -3271,6 +3269,54 @@ function facePieces(id,base){
   });
   return out;
 }
+// ---- 磚片編號：字級統一（3D 依實際尺寸，與壁磚圖同比例），並避開門窗、浴缸、設備 ----
+const LABEL_MM=55; // 壁磚圖預設縮放下 10px ≈ 55mm
+function labelFont(PXv,pc){
+  const m=Math.min(pc.cw,pc.ch)*PXv*.32;
+  return state._px?Math.min(LABEL_MM*PXv,m):Math.min(10,m);
+}
+// 在磚片內找一個不被遮擋、放得下文字的位置（mm）；找不到回傳 null
+function findLabelSpot(pc,tw,th,obs){
+  const r={x1:pc.x,y1:pc.y,x2:pc.x+pc.cw,y2:pc.y+pc.ch},F=[0.5,0.38,0.62,0.26,0.74,0.14,0.86];
+  const cand=[];F.forEach(fx=>F.forEach(fy=>cand.push([r.x1+(r.x2-r.x1)*fx,r.y1+(r.y2-r.y1)*fy])));
+  const cx=(r.x1+r.x2)/2,cy=(r.y1+r.y2)/2;cand.sort((a,b)=>Math.hypot(a[0]-cx,a[1]-cy)-Math.hypot(b[0]-cx,b[1]-cy));
+  for(const[x,y]of cand){
+    const b={x1:x-tw/2,y1:y-th/2,x2:x+tw/2,y2:y+th/2};
+    if(b.x1<r.x1||b.x2>r.x2||b.y1<r.y1||b.y2>r.y2)continue;
+    if(obs.some(o=>b.x1<o.x2&&b.x2>o.x1&&b.y1<o.y2&&b.y2>o.y1))continue;
+    return[x,y];
+  }
+  return null;
+}
+// 畫一個編號：X,Y＝面左上角畫布座標
+function drawTileLabel(txt,pc,X,Y,PXv,obs,color){
+  const fs0=labelFont(PXv,pc);if(fs0<4)return;
+  for(const k of[1,0.75,0.55]){
+    const fs=fs0*k;if(fs<4)break;
+    ctx.font=`${fs}px DM Mono,monospace`;
+    const tw=(ctx.measureText(txt).width+fs*0.4)/PXv,th=(fs*1.1)/PXv,sp=findLabelSpot(pc,tw,th,obs||[]);
+    if(sp){ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,X+sp[0]*PXv,Y+sp[1]*PXv);return;}
+  }
+  // 整片都被擋住：仍標在中央，加白底以免看不到
+  const fs=Math.max(4,fs0*0.75);ctx.font=`${fs}px DM Mono,monospace`;
+  const w=ctx.measureText(txt).width+4,cx=X+(pc.x+pc.cw/2)*PXv,cy=Y+(pc.y+pc.ch/2)*PXv;
+  ctx.fillStyle='rgba(255,255,255,.85)';ctx.fillRect(cx-w/2,cy-fs*0.6,w,fs*1.2);
+  ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,cx,cy);
+}
+// 某一面上會遮住磚的東西（面內 mm）：門窗、浴缸、壁面設備與靠牆的地面設備
+function faceObstacles(id,base){
+  const obs=base.excl.map(e=>({x1:e.x1,y1:e.y1,x2:e.x2,y2:e.y2}));
+  if(base.seg){const sg=base.seg,H=base.h;
+    wallItemsForFace(sg.key).forEach(it=>{const fx=sg.flip?sg.len-it.wX*10-it.w*10:it.wX*10,fy=H-it.sill*10-it.h*10;obs.push({x1:fx,y1:fy,x2:fx+it.w*10,y2:fy+it.h*10});});}
+  return obs;
+}
+// 地面上會遮住磚的東西（地板 mm）
+function floorObstacles(p,d){
+  const sm=spaceModel(p,d),obs=floorExclusions(p,d).slice();
+  sm.cols.forEach(c=>obs.push({x1:c.x1,y1:c.y1,x2:c.x2,y2:c.y2}));
+  state.stickers.forEach(st=>{if(st.wallOnly||!stkShown(st)||st._placing)return;obs.push(stkFootprint(st));});
+  return obs;
+}
 // 畫一面的磚（壁磚圖、3D 貼圖、地磚圖的檯面）
 function drawFacePieces(X,Y,base,pieces,labels){
   const PX=PXpm();
@@ -3282,13 +3328,12 @@ function drawFacePieces(X,Y,base,pieces,labels){
       if(pc.isPartial&&state.showCut!==false){ctx.fillStyle='rgba(240,190,90,.30)';ctx.fillRect(px,py,pw,ph);}}
     else{ctx.fillStyle=tileFill(pc.isPartial);ctx.fillRect(px,py,pw,ph);}
     if(!state._px){ctx.strokeStyle='#C0BCB4';ctx.lineWidth=0.5;ctx.strokeRect(px+.5,py+.5,pw-1,ph-1);}
-    if(labels&&labels[i]&&state.showNum!==false&&pw>14&&ph>10){
-      ctx.fillStyle=pc.isPartial&&state.showCut!==false?'#8B5E3C':(pc.spec.color?'#4D5153':'#8A8780');
-      const fs=state._px?Math.max(8,Math.min(pw,ph)*.2):Math.min(10,Math.min(pw,ph)*.32);
-      ctx.font=`${fs}px DM Mono,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(labels[i],px+pw/2,py+ph/2);
-    }
   });
+  if(labels&&state.showNum!==false){
+    const obs=faceObstacles(base.seg?'seg:'+base.seg.key:'',base);
+    pieces.forEach((pc,i)=>{if(!labels[i])return;
+      drawTileLabel(labels[i],pc,X,Y,PX,obs,pc.isPartial&&state.showCut!==false?'#8B5E3C':(pc.spec.color?'#4D5153':'#8A8780'));});
+  }
   // 分段線
   const zs=faceZones(base.seg?'seg:'+base.seg.key:'tub:'+base.tub.s.id+':'+base.tub.edge,base);
   if(zs.length>1){const y=Y+zs[1].y0*PX;ctx.strokeStyle='#5E6264';ctx.lineWidth=1.4;ctx.setLineDash([6,3]);ctx.beginPath();ctx.moveTo(X,y);ctx.lineTo(X+base.w*PX,y);ctx.stroke();ctx.setLineDash([]);}
@@ -3372,14 +3417,12 @@ function drawTileSurface(surfX,surfY,surfW,surfH,originSX,originSY,flipX,flipY,e
       ctx.strokeStyle='#C0BCB4';ctx.lineWidth=0.5;
       ctx.strokeRect(px+.5,py+.5,pw-1,ph-1);
     } // 3D：磚縫改由 tileLines3D 畫成線條
-    // 磚片編號（與地磚圖相同樣式；3D 貼圖字放大）
-    if(labels&&labels[i]&&state.showNum!==false&&pw>14&&ph>10){
-      ctx.fillStyle=pc.isPartial&&state.showCut!==false?'#8B5E3C':'#8A8780';
-      const fs=state._px?Math.max(8,Math.min(pw,ph)*.2):Math.min(10,Math.min(pw,ph)*.32);
-      ctx.font=`${fs}px DM Mono,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(labels[i],px+pw/2,py+ph/2);
-    }
   });
+  if(labels&&state.showNum!==false){
+    const obs=(tileOvr&&tileOvr.obs)||exclusions;
+    layoutSurface(surfW,surfH,originSX,originSY,tW,tH,tG,tLay,exclusions).forEach((pc,i)=>{if(!labels[i])return;
+      drawTileLabel(labels[i],pc,surfX,surfY,PX,obs,pc.isPartial&&state.showCut!==false?'#8B5E3C':'#8A8780');});
+  }
   ctx.restore();
 }
 
@@ -3938,7 +3981,7 @@ function build3D(){
   // ---- 地板 ----
   const smodel=spaceModel(p,d);
   const fcv=offscreenSurface(iwmm,ihmm,s=>{
-    drawTileSurface(0,0,iwmm,ihmm,p.originX*10,p.originY*10,false,false,floorExclusions(p,d),{tileW:p.tileW,tileH:p.tileH,grout:p.grout,layout:p.layout,labels:floorNumbering()});
+    drawTileSurface(0,0,iwmm,ihmm,p.originX*10,p.originY*10,false,false,floorExclusions(p,d),{tileW:p.tileW,tileH:p.tileH,grout:p.grout,layout:p.layout,labels:floorNumbering(),obs:floorObstacles(p,d)});
     smodel.outRects.forEach(r=>ctx.clearRect(r.x1*s,r.y1*s,(r.x2-r.x1)*s,(r.y2-r.y1)*s));
     ctx.fillStyle='#6E7274';smodel.cols.forEach(c=>{if(smodel.segs.some(g=>g.kind!=='wall'&&((g.axis==='h'&&(Math.abs(g.c-c.y1)<1||Math.abs(g.c-c.y2)<1))||(g.axis==='v'&&(Math.abs(g.c-c.x1)<1||Math.abs(g.c-c.x2)<1)))))ctx.fillRect(c.x1*s,c.y1*s,(c.x2-c.x1)*s,(c.y2-c.y1)*s);});
     // 地面設備貼紙
