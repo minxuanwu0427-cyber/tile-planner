@@ -4505,6 +4505,9 @@ function build3D(){
     V3.walls.push({key:seg.key,mesh,mat,edges,sp,p0:new THREE.Vector3(P0.x/10,0,P0.y/10),n:zv,col:isCol,colWalls:isCol&&colOfFace[seg.key]?colOfFace[seg.key].roomWalls:[]});
   });
 
+  // ---- 牆厚：牆頂面＋兩端斷面（跟著該面牆一起隱藏）----
+  addWallThickness3D(root,smodel,p,H);
+
   // ---- 障礙物與設備（立體，可在 3D 點選拖曳）----
   V3.items=new Map();V3.picks=[];
   const lit=c=>new THREE.MeshLambertMaterial({color:c});
@@ -4884,6 +4887,30 @@ function makeMirrorCab3D(s,dp){
   g.add(m);return g;
 }
 
+// ---- 3D：牆厚 ----
+function addWallThickness3D(root,sm,p,H){
+  const wt=p.wallT*10;if(!(wt>0))return;
+  const ring=sm.ring||sm,segsAll=wallSegs(p,innerDim());
+  const CAP=0x7C8082,END=0x9A9EA0;
+  const mat=c=>new THREE.MeshBasicMaterial({color:c,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+  ring.segs.filter(s=>s.kind==='wall').forEach(s=>{
+    const ca=s.axis==='h'?ring.corner(s.a,s.c):ring.corner(s.c,s.a),cb=s.axis==='h'?ring.corner(s.b,s.c):ring.corner(s.c,s.b);
+    const a=(s.a-(ca==='in'?wt:0))/10,b=(s.b+(cb==='in'?wt:0))/10,T=wt/10,L=b-a;if(L<=0)return;
+    const c0=(s.side>0?s.c-wt:s.c)/10; // 牆外側邊界（較小那側）
+    const g=new THREE.Group();
+    const add=(geo,col,x,y,z)=>{const m=new THREE.Mesh(geo,mat(col));m.position.set(x,y,z);m.add(edgeLines(geo,0x2B2F31,0.9));g.add(m);};
+    if(s.axis==='h'){
+      const top=new THREE.PlaneGeometry(L,T);top.rotateX(-Math.PI/2);add(top,CAP,a+L/2,H,c0+T/2);
+      [a,b].forEach(x=>{const e=new THREE.PlaneGeometry(T,H);e.rotateY(Math.PI/2);add(e,END,x,H/2,c0+T/2);});
+    } else {
+      const top=new THREE.PlaneGeometry(T,L);top.rotateX(-Math.PI/2);add(top,CAP,c0+T/2,H,a+L/2);
+      [a,b].forEach(z=>{const e=new THREE.PlaneGeometry(T,H);add(e,END,c0+T/2,H/2,z);});
+    }
+    root.add(g);
+    const keys=segsAll.filter(w=>w.kind==='wall'&&w.axis===s.axis&&w.side===s.side&&Math.abs(w.c-s.c)<1).map(w=>w.key);
+    V3.attached.push({obj:g,walls:keys});
+  });
+}
 // ---- 3D：窗洞收邊（窗框內退，四周側面貼磚，窗在內退處）----
 function revealStripTex(lenmm,Dmm,vertical,spec){
   const w=vertical?Dmm:lenmm,h=vertical?lenmm:Dmm;
