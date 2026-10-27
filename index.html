@@ -2129,7 +2129,7 @@ function renderProcList(){
 }
 
 // ---- DRAW FUNCTIONS ----
-const MARGIN=82;
+const MARGIN=140;
 function PXpm(){return state._px||state.scale*0.28;}
 function toCanvas(mmx,mmy){const s=PXpm();return[MARGIN+mmx*s,MARGIN+mmy*s];}
 function toWorld(cx,cy){const s=PXpm();return[(cx-MARGIN)/s,(cy-MARGIN)/s];}
@@ -2454,44 +2454,63 @@ function render(){
 
 // ---- 外圈尺寸標註：每一側一列分段尺寸（牆、柱、管道間的轉折點），下一列為總長 ----
 const DIM_LETTER_OFF=66;
+// 外圈尺寸標註（施工圖樣式）：延伸線從牆邊拉出、數字一律正著看
+// 每側一列分段尺寸；分段超過一段時，外面再加一列總長
 function drawDimChains(sm,tx,ty,wtmm,outerWmm,outerHmm){
   const fmt=v=>{const c=Math.round(v)/10;return (Math.round(c*10)/10).toString();};
+  const FS=12,GAP=4,EXT=5,COL='#6E7274';
   const sides=[
-    {axis:'h',side:1, pos:o=>ty(0)-o, dir:-1},   // 上
-    {axis:'h',side:-1,pos:o=>ty(outerHmm)+o,dir:1}, // 下
-    {axis:'v',side:1, pos:o=>tx(0)-o, dir:-1},   // 左
-    {axis:'v',side:-1,pos:o=>tx(outerWmm)+o,dir:1}, // 右
+    {key:'top',   axis:'h',side:1, pos:o=>ty(0)-o,       dir:-1},
+    {key:'bottom',axis:'h',side:-1,pos:o=>ty(outerHmm)+o,dir:1},
+    {key:'left',  axis:'v',side:1, pos:o=>tx(0)-o,       dir:-1},
+    {key:'right', axis:'v',side:-1,pos:o=>tx(outerWmm)+o,dir:1},
   ];
-  ctx.save();
+  state._dimOff={};
+  ctx.save();ctx.font=`${FS}px DM Mono,monospace`;
   sides.forEach(S=>{
     const segs=sm.segs.filter(g=>g.axis===S.axis&&g.side===S.side);if(!segs.length)return;
     let pts=[];segs.forEach(g=>pts.push(g.a,g.b));
     pts=pts.map(v=>Math.round(v)).sort((a,b)=>a-b).filter((v,i,a)=>i===0||v-a[i-1]>2);
     if(pts.length<2)return;
     const along=v=>S.axis==='h'?tx(wtmm+v):ty(wtmm+v);
-    const rows=pts.length>2?[{o:16,p:pts},{o:34,p:[pts[0],pts[pts.length-1]]}]:[{o:16,p:pts}];
-    rows.forEach((R,ri)=>{
+    const rowsP=pts.length>2?[pts,[pts[0],pts[pts.length-1]]]:[pts];
+    // 每列的位置：橫向列固定間距；直向列要讓出數字寬度
+    let o=16;const rows=rowsP.map(p=>{
+      const labels=[];for(let i=0;i<p.length-1;i++)labels.push(fmt(p[i+1]-p[i]));
+      const tw=Math.max(...labels.map(t=>ctx.measureText(t).width));
+      const R={o,p,labels,tw};o+=S.axis==='h'?FS+GAP+10:tw+GAP+12;return R;});
+    const last=rows[rows.length-1];
+    state._dimOff[S.key]=last.o+GAP+(S.axis==='h'?FS:last.tw)+18;
+    const L=(a1,q1,a2,q2)=>{ctx.beginPath();if(S.axis==='h'){ctx.moveTo(a1,q1);ctx.lineTo(a2,q2);}else{ctx.moveTo(q1,a1);ctx.lineTo(q2,a2);}ctx.stroke();};
+    ctx.strokeStyle=COL;ctx.lineWidth=0.8;ctx.setLineDash([]);
+    rows.forEach(R=>{
       const q=S.pos(R.o),A=along(R.p[0]),B=along(R.p[R.p.length-1]);
-      ctx.strokeStyle='#6E7274';ctx.lineWidth=0.8;ctx.setLineDash([]);
-      const L=(x1,y1,x2,y2)=>{ctx.beginPath();if(S.axis==='h'){ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);}else{ctx.moveTo(y1,x1);ctx.lineTo(y2,x2);}ctx.stroke();};
-      L(A-4,q,B+4,q);
-      R.p.forEach(v=>{const a=along(v);
-        L(a,q-S.dir*5,a,q+S.dir*3);           // 延伸線
-        ctx.lineWidth=1.4;L(a-3,q+3,a+3,q-3);ctx.lineWidth=0.8;}); // 斜短線
-      for(let i=0;i<R.p.length-1;i++){
-        const a=along(R.p[i]),b=along(R.p[i+1]),mid=(a+b)/2,txt=fmt(R.p[i+1]-R.p[i]);
-        let fs=ri?11:10;ctx.font=`${ri?'600 ':''}${fs}px DM Mono,monospace`;
-        let w=ctx.measureText(txt).width;
-        if(w>b-a-2){fs=8;ctx.font=`${fs}px DM Mono,monospace`;w=ctx.measureText(txt).width;}
-        const tight=w>b-a-2,toff=4+(tight&&i%2?9:0);
-        ctx.fillStyle=ri?'#2E3B3A':'#45494B';ctx.textAlign='center';ctx.textBaseline=S.dir<0?'bottom':'top';
-        if(S.axis==='h')ctx.fillText(txt,mid,q+S.dir*toff);
-        else{ctx.save();ctx.translate(q+S.dir*toff,mid);ctx.rotate(-Math.PI/2);ctx.textBaseline='bottom';
-          if(S.dir>0){ctx.rotate(Math.PI);}ctx.fillText(txt,0,0);ctx.restore();}
-      }
+      L(A,q,B,q);                                   // 尺寸線
+      R.p.forEach(v=>{const a=along(v);L(a,S.pos(4),a,q+S.dir*EXT);}); // 延伸線：從牆邊拉到尺寸線外
+      ctx.fillStyle=COL;
+      R.labels.forEach((txt,i)=>{
+        const a=along(R.p[i]),b=along(R.p[i+1]),mid=(a+b)/2,w=ctx.measureText(txt).width;
+        const n=R.labels.length,first=i===0,lastI=i===n-1;
+        if(S.axis==='h'){
+          const tight=w>b-a-4;ctx.textBaseline=S.dir<0?'bottom':'top';
+          // 太窄：頭尾段的數字放到線外側，中間段上下錯開
+          if(tight&&lastI&&n>1){ctx.textAlign='left';ctx.fillText(txt,b+4,q+S.dir*GAP);}
+          else if(tight&&first&&n>1){ctx.textAlign='right';ctx.fillText(txt,a-4,q+S.dir*GAP);}
+          else{ctx.textAlign='center';ctx.fillText(txt,mid,q+S.dir*(GAP+(tight&&i%2?FS+2:0)));}
+        }else{
+          const tight=FS>b-a-2;ctx.textAlign=S.dir<0?'right':'left';
+          if(tight&&lastI&&n>1){ctx.textBaseline='top';ctx.fillText(txt,q+S.dir*GAP,b+3);}
+          else if(tight&&first&&n>1){ctx.textBaseline='bottom';ctx.fillText(txt,q+S.dir*GAP,a-3);}
+          else{ctx.textBaseline='middle';ctx.fillText(txt,q+S.dir*GAP,mid+(tight&&i%2?FS:0));}
+        }
+      });
     });
   });
   ctx.restore();
+}
+function dimLetterOff(r){
+  const k=r.axis==='h'?(r.side>0?'top':'bottom'):(r.side>0?'left':'right');
+  return ((state._dimOff||{})[k])||DIM_LETTER_OFF;
 }
 function renderFloorView(){
   const p=P();const d=innerDim();
@@ -2697,7 +2716,7 @@ function renderFloorView(){
   // 主牆字母（往牆外側）＋ 同一主牆有多段時，各段小編號
   sm.groups.forEach(g=>{
     const mem=g.fronts.concat(g.rets),multi=mem.length>1;
-    if(g.ring){const r=g.ring,mid=(r.a+r.b)/2,edge=r.axis==='h'?(r.c<1||r.c>innerHmm-1):(r.c<1||r.c>innerWmm-1),off=wtmm*PX+(edge?DIM_LETTER_OFF:30);let x,y;
+    if(g.ring){const r=g.ring,mid=(r.a+r.b)/2,edge=r.axis==='h'?(r.c<1||r.c>innerHmm-1):(r.c<1||r.c>innerWmm-1),off=wtmm*PX+(edge?dimLetterOff(r):30);let x,y;
       if(r.axis==='h'){x=tx(wtmm+mid);y=ty(wtmm+r.c)-r.side*off;}else{y=ty(wtmm+mid);x=tx(wtmm+r.c)-r.side*off;}
       ctx.beginPath();ctx.arc(x,y,11,0,Math.PI*2);ctx.fillStyle='#2E3B3A';ctx.fill();
       ctx.fillStyle='#FFF';ctx.font='bold 12px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g.tag,x,y);}
