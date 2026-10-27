@@ -145,6 +145,22 @@ canvas{display:block}
 .modal-note{font-size:11px;color:var(--faint);margin-bottom:16px;line-height:1.5}
 .modal-spec{font-size:11px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:16px;line-height:1.8;font-family:var(--mono)}
 .modal-btns{display:flex;gap:8px;justify-content:flex-end}
+#summaryModal .modal{max-width:1200px;width:94vw;max-height:90vh;overflow:auto}
+.sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:6px}
+.sum-col{border:1px solid var(--border);border-radius:8px;padding:12px;background:#fff}
+.sum-col>div:first-child,.sum-col>div:nth-child(1){margin-top:0!important}
+.sum-col .modal-stats{grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.sum-col .modal-stat{grid-column:auto!important;padding:8px}
+.sum-col .modal-stat-v{font-size:21px}
+.cut-src{display:block;font-size:10px;margin-top:3px;color:var(--muted);font-family:var(--sans)}
+.sum-col .modal-spec,.sum-col .modal-note{margin-bottom:6px}
+/* 顯示選單 */
+.disp-menu{position:relative}
+.disp-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:50;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);padding:8px 10px;min-width:230px;display:none}
+.disp-pop.open{display:block}
+.disp-pop label{display:flex;align-items:flex-start;gap:6px;padding:5px 2px;font-size:12px;color:var(--text);cursor:pointer;white-space:nowrap}
+.disp-pop label small{display:block;color:var(--muted);font-size:10px;white-space:normal}
+.disp-pop .sep{height:1px;background:var(--border);margin:4px 0}
 </style>
 </head>
 <body>
@@ -504,6 +520,8 @@ canvas{display:block}
 <div class="modal-overlay hidden" id="summaryModal" onclick="if(event.target===this)closeSummaryModal()">
   <div class="modal">
     <div class="modal-title">磚量統計</div>
+    <div class="sum-grid">
+    <div class="sum-col">
     <!-- 地磚 -->
     <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin-bottom:7px">地磚</div>
     <div class="modal-stats">
@@ -525,8 +543,10 @@ canvas{display:block}
     </div>
     <div class="modal-spec" id="mSpec"></div>
     <div class="modal-note" id="mNote"></div>
+    </div>
+    <div class="sum-col">
     <!-- 壁磚 -->
-    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:14px 0 7px">壁磚（各面合計）</div>
+    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 7px">壁磚（各面合計）</div>
     <div class="modal-stats">
       <div class="modal-stat">
         <div class="modal-stat-l">整磚</div>
@@ -546,7 +566,9 @@ canvas{display:block}
     </div>
     <div class="modal-spec" id="mWallSpec"></div>
     <div class="modal-note" id="mWallNote"></div>
-    <div id="mTubBlock"></div>
+    </div>
+    <div id="mTubBlock" style="display:contents"></div>
+    </div>
     <div class="modal-btns">
       <button class="btn btn-sm" onclick="exportSummaryJPG()">另存 JPG</button>
       <button class="btn btn-sm btn-p" onclick="closeSummaryModal()">關閉</button>
@@ -727,8 +749,16 @@ canvas{display:block}
     <div style="display:flex;gap:12px;margin-left:auto;align-items:center">
       <div class="li"><div class="ls" style="background:#E8E4DC"></div>整磚</div>
       <div class="li" id="cutLegend"><div class="ls" style="background:#F0E6C8"></div>裁切</div>
-      <label class="li" style="cursor:pointer;gap:4px" title="取消勾選：所有磚面同色"><input type="checkbox" id="showCutChk" checked onchange="toggleShowCut(this.checked)">標示裁切磚</label>
-      <label class="li" style="cursor:pointer;gap:4px" title="地磚圖、壁磚圖、3D 的磚片編號"><input type="checkbox" id="showNumChk" checked onchange="toggleShowNum(this.checked)">顯示編號</label>
+      <div class="disp-menu" id="dispMenu">
+        <button class="btn btn-sm" onclick="event.stopPropagation();document.getElementById('dispPop').classList.toggle('open')">顯示項目 ▾</button>
+        <div class="disp-pop" id="dispPop" onclick="event.stopPropagation()">
+          <label><input type="checkbox" id="showCutChk" checked onchange="toggleShowCut(this.checked)"><span>標示裁切磚<small>取消時所有磚面同色</small></span></label>
+          <label><input type="checkbox" id="showNumChk" checked onchange="toggleShowNum(this.checked)"><span>磚片編號<small>地磚圖、壁磚圖、3D</small></span></label>
+          <label><input type="checkbox" id="showDimChk" checked onchange="toggleShowDims(this.checked)"><span>尺寸標註<small>地磚圖、壁磚圖</small></span></label>
+          <div class="sep"></div>
+          <label><input type="checkbox" id="showDecorChk2" checked onchange="toggleShowDecor(this.checked)"><span>圖面完整度設備<small>馬桶、鏡櫃、浴櫃、獨立浴缸（不影響計算）</small></span></label>
+        </div>
+      </div>
     </div>
   </div>
   <!-- 起鋪點數值列（地磚圖／壁磚圖） -->
@@ -812,13 +842,15 @@ const STICKER_DEFAULTS={
 let renderTimer=null;
 // 磚面顏色：可切換是否標示裁切磚
 function tileFill(isPartial){return isPartial&&state.showCut!==false?'#F0E6C8':'#E8E4DC';}
+function toggleShowDims(on){state.showDims=on;scheduleRender();}
+document.addEventListener('click',()=>{const p=document.getElementById('dispPop');if(p)p.classList.remove('open');});
 function toggleShowNum(on){state.showNum=on;scheduleRender();}
 function toggleShowCut(on){state.showCut=on;const l=document.getElementById('cutLegend');if(l)l.style.opacity=on?1:0.35;scheduleRender();}
 const DECOR_TYPES=new Set(['toilet','bathroomCab','mirrorCab','freeTub']);
 function isDecor(s){return DECOR_TYPES.has(s.type);}
 function stkShown(s){return !isDecor(s)||state.showDecor!==false||s._placing;}
 function toggleShowDecor(on){state.showDecor=on;updateDecorEye();renderStickerList();scheduleRender();}
-function updateDecorEye(){const on=state.showDecor!==false,b=document.getElementById('showDecorBtn'),l=document.getElementById('eyeSlash');if(l)l.style.display=on?'none':'';if(b){b.title=on?'隱藏圖面完整度物件':'顯示圖面完整度物件';b.style.opacity=on?1:0.6;}}
+function updateDecorEye(){const c2=document.getElementById('showDecorChk2');if(c2)c2.checked=state.showDecor!==false;const on=state.showDecor!==false,b=document.getElementById('showDecorBtn'),l=document.getElementById('eyeSlash');if(l)l.style.display=on?'none':'';if(b){b.title=on?'隱藏圖面完整度物件':'顯示圖面完整度物件';b.style.opacity=on?1:0.6;}}
 function scheduleRender(){clearTimeout(renderTimer);renderTimer=setTimeout(render,50)}
 
 // ---- 牆面區段（矩形 4 面；L 型 6 面，含缺角兩面 E/F）----
@@ -2889,7 +2921,7 @@ function renderFloorView(){
     ctx.stroke();});
 
   // 外圈尺寸標註（室內淨尺寸）
-  drawDimChains(sm,tx,ty,wtmm,outerWmm,outerHmm);
+  if(state.showDims!==false)drawDimChains(sm,tx,ty,wtmm,outerWmm,outerHmm);else state._dimOff={};
 
   // 主牆字母（往牆外側）＋ 同一主牆有多段時，各段小編號
   sm.groups.forEach(g=>{
@@ -3159,7 +3191,7 @@ function renderTubFaceView(f){
   ctx.fillText(f.label,X+wPX/2,PAD+LBLH/2);
   ctx.fillStyle='#7A776E';ctx.font='10px DM Mono,monospace';ctx.textBaseline='top';
   // 尺寸標註：下方寬度、左側高度（檯面另標缸口位置）
-  {const xs=[0,f.w],ys=[0,f.h];f.excl.forEach(e=>{xs.push(e.x1,e.x2);ys.push(e.y1,e.y2);});
+  if(state.showDims!==false){const xs=[0,f.w],ys=[0,f.h];f.excl.forEach(e=>{xs.push(e.x1,e.x2);ys.push(e.y1,e.y2);});
     drawDimGroup('h',1,Y+hPX,xs,v=>X+v*PX,18);drawDimGroup('v',-1,X,ys,v=>Y+v*PX,14);}
   ctx.fillStyle='#7A776E';ctx.font='10px DM Mono,Noto Sans TC,monospace';ctx.textAlign='center';ctx.textBaseline='top';
   ctx.fillText(`${f.spec.name} ${f.spec.tileW/10}×${f.spec.tileH/10} cm`+(f.kind==='deck'?'　（上＝A 側）':''),X+wPX/2,Y+hPX+66);
@@ -3682,7 +3714,7 @@ function renderWallView(){
   if(!g.free&&!sideIn[0]){ctx.beginPath();ctx.moveTo(mX,top);ctx.lineTo(mX,top+hPX);ctx.stroke();}
   if(!g.free&&!sideIn[1]){ctx.beginPath();ctx.moveTo(rX,top);ctx.lineTo(rX,top+hPX);ctx.stroke();}
   // 尺寸標註：下方＝各段、門窗、浴缸位置；左側＝高度（門窗、缸緣）
-  {const xs=[0,g.len],ys=[0,wallHmm];
+  if(state.showDims!==false){const xs=[0,g.len],ys=[0,wallHmm];
     g.fronts.forEach(sg=>{xs.push(sg.px,sg.px+sg.len);
       wallObsExclusions(sg.key,sg.len,wallHmm).forEach(e=>{xs.push(sg.px+e.x1,sg.px+e.x2);ys.push(e.y1,e.y2);});});
     drawDimGroup('h',1,top+hPX,xs,v=>mX+v*PX,18);
@@ -4851,7 +4883,7 @@ function showSummaryModal(){
   const lnames={straight:'平貼',half:'1/2交丁（橫）',third:'1/3交丁（橫）','half-v':'1/2交丁（直）'};
   // 地磚
   document.getElementById('mStatFull').textContent=document.getElementById('statFull').textContent;
-  document.getElementById('mStatCut').textContent=document.getElementById('statCut').textContent;
+  document.getElementById('mStatCut').innerHTML=document.getElementById('statCut').textContent.replace(/\s*\((\d+)片磚\)/,'<span class="cut-src">（$1 片磚）</span>');
   document.getElementById('mStatOrder').textContent=document.getElementById('statOrder').textContent;
   let spec=`淨空間 ${d.iw}×${d.ih} cm`;
   if(p.lShape)spec+=`　L 型缺角（${p.lCorner}）${p.lCutW}×${p.lCutH} cm`;
@@ -4867,25 +4899,25 @@ function showSummaryModal(){
   document.getElementById('mWallNote').textContent=p.wallWaste>0?`建議叫貨已含 ${p.wallWaste}% 損耗`:'（損耗 0%，請依現場條件自行調整）';
   // 嵌入式浴缸（半牆＋檯面）
   const tr=calculateTubTiles();
-  document.getElementById('mTubBlock').innerHTML=tr.map(t=>`
-    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:14px 0 7px">嵌入式浴缸 半牆＋檯面（${t.spec.name}，${t.faces} 面）</div>
+  document.getElementById('mTubBlock').innerHTML=tr.map(t=>`<div class="sum-col">
+    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 7px">嵌入式浴缸 半牆＋檯面（${t.spec.name}，${t.faces} 面）</div>
     <div class="modal-stats">
       <div class="modal-stat"><div class="modal-stat-l">整磚</div><div class="modal-stat-v">${t.full}</div><div class="modal-stat-u">片</div></div>
-      <div class="modal-stat"><div class="modal-stat-l">裁切片數</div><div class="modal-stat-v" style="color:var(--warn)">${t.cut}${t.sources<t.cut?' ('+t.sources+'片磚)':''}</div><div class="modal-stat-u">片</div></div>
+      <div class="modal-stat"><div class="modal-stat-l">裁切片數</div><div class="modal-stat-v" style="color:var(--warn)">${t.cut}${t.sources<t.cut?'<span class="cut-src">（'+t.sources+' 片磚）</span>':''}</div><div class="modal-stat-u">片</div></div>
       <div class="modal-stat" style="grid-column:span 2"><div class="modal-stat-l">建議叫貨</div><div class="modal-stat-v" style="color:var(--accent)">${t.order}</div><div class="modal-stat-u">片</div></div>
     </div>
-    <div class="modal-note">${t.spec.name} ${t.spec.tileW/10}×${t.spec.tileH/10} cm，未併入上方${t.spec.name}數量；同規格請相加叫貨（${t.spec.name}合計約 ${t.order+(t.spec.key==='wall'?wr.order:(+document.getElementById('mStatOrder').textContent||0))} 片）。</div>`).join('');
+    <div class="modal-note">${t.spec.name} ${t.spec.tileW/10}×${t.spec.tileH/10} cm，未併入上方${t.spec.name}數量；同規格請相加叫貨（${t.spec.name}合計約 ${t.order+(t.spec.key==='wall'?wr.order:(+document.getElementById('mStatOrder').textContent||0))} 片）。</div></div>`).join('');
   // 特殊磚
   const G=tileGroupStats(),lnm={straight:'平貼',half:'1/2交丁（橫）',third:'1/3交丁（橫）','half-v':'1/2交丁（直）'};
   const faceName=id=>{const[k,a,b]=id.split(':');if(k==='seg'){const sg=getSeg(a);return sg?sg.tag:a;}return b==='deck'?'浴缸檯面':'半牆'+(TUB_EDGE_LBL[b]||'');};
   document.getElementById('mTubBlock').innerHTML+=(state.tileTypes||[]).map(t=>{const g=G[t.code];if(!g)return'';const sp=g.spec;
-    return `<div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:14px 0 7px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sp.color};margin-right:5px;vertical-align:-1px"></span>${t.code}・${sp.name}</div>
+    return `<div class="sum-col"><div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 7px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sp.color};margin-right:5px;vertical-align:-1px"></span>${t.code}・${sp.name}</div>
     <div class="modal-stats">
       <div class="modal-stat"><div class="modal-stat-l">整磚</div><div class="modal-stat-v">${g.full}</div><div class="modal-stat-u">片</div></div>
-      <div class="modal-stat"><div class="modal-stat-l">裁切片數</div><div class="modal-stat-v" style="color:var(--warn)">${g.cut}${g.sources<g.cut?' ('+g.sources+'片磚)':''}</div><div class="modal-stat-u">片</div></div>
+      <div class="modal-stat"><div class="modal-stat-l">裁切片數</div><div class="modal-stat-v" style="color:var(--warn)">${g.cut}${g.sources<g.cut?'<span class="cut-src">（'+g.sources+' 片磚）</span>':''}</div><div class="modal-stat-u">片</div></div>
       <div class="modal-stat" style="grid-column:span 2"><div class="modal-stat-l">建議叫貨</div><div class="modal-stat-v" style="color:var(--accent)">${g.order}</div><div class="modal-stat-u">片</div></div>
     </div>
-    <div class="modal-note">${sp.tileW/10}×${sp.tileH/10} cm　縫 ${sp.grout} mm　${lnm[sp.layout]||''}　使用面：${[...g.faces].map(faceName).join('、')}${sp.waste?`　已含 ${sp.waste}% 損耗`:''}</div>`;}).join('');
+    <div class="modal-note">${sp.tileW/10}×${sp.tileH/10} cm　縫 ${sp.grout} mm　${lnm[sp.layout]||''}　使用面：${[...g.faces].map(faceName).join('、')}${sp.waste?`　已含 ${sp.waste}% 損耗`:''}</div></div>`;}).join('');
   document.getElementById('summaryModal').classList.remove('hidden');
 }
 function closeSummaryModal(){document.getElementById('summaryModal').classList.add('hidden');}
