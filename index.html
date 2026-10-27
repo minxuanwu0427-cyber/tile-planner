@@ -3072,11 +3072,12 @@ function drawTubAprons(tx,ty,wtmm,PX){
 // 地磚圖：浴缸檯面的磚面配置（避開缸口），疊在浴缸符號上
 function drawDeckOnFloor(tx,ty,wtmm,PX){
   if(!stkShownTub())return;
+  const nums=wallNumbering();
   tubFaces().filter(f=>f.kind==='deck').forEach(f=>{
     const r=stkFootprint(f.s),X=tx(wtmm+r.x1),Y=ty(wtmm+r.y1),h=f.excl[0];
     ctx.save();
     ctx.beginPath();ctx.rect(X,Y,f.w*PX,f.h*PX);ctx.rect(X+h.x1*PX,Y+h.y1*PX,(h.x2-h.x1)*PX,(h.y2-h.y1)*PX);ctx.clip('evenodd');
-    drawTileSurface(X,Y,f.w,f.h,f.ox||0,f.oy||0,false,false,f.excl,{tileW:f.spec.tileW,tileH:f.spec.tileH,grout:f.spec.grout,layout:f.spec.layout});
+    drawTileSurface(X,Y,f.w,f.h,f.ox||0,f.oy||0,false,false,f.excl,{tileW:f.spec.tileW,tileH:f.spec.tileH,grout:f.spec.grout,layout:f.spec.layout,labels:nums['tub:'+f.s.id+':deck']});
     ctx.restore();
     ctx.save();ctx.strokeStyle='#2B2F31';ctx.lineWidth=1.4;ctx.setLineDash([]);ctx.strokeRect(X,Y,f.w*PX,f.h*PX);
     ctx.strokeStyle='#5B8FB9';ctx.lineWidth=1.2;ctx.strokeRect(X+h.x1*PX,Y+h.y1*PX,(h.x2-h.x1)*PX,(h.y2-h.y1)*PX);ctx.restore();
@@ -3085,7 +3086,8 @@ function drawDeckOnFloor(tx,ty,wtmm,PX){
 function stkShownTub(){return true;}
 // 畫一個貼磚面（壁磚圖用 / 3D 貼圖用）
 function drawTubFaceSurface(f,X,Y,PX){
-  drawTileSurface(X,Y,f.w,f.h,f.ox||0,f.oy||0,false,false,f.excl,{tileW:f.spec.tileW,tileH:f.spec.tileH,grout:f.spec.grout,layout:f.spec.layout});
+  const lb=state._wallNums&&!state._px?state._wallNums['tub:'+f.s.id+':'+f.edge]:null;
+  drawTileSurface(X,Y,f.w,f.h,f.ox||0,f.oy||0,false,false,f.excl,{tileW:f.spec.tileW,tileH:f.spec.tileH,grout:f.spec.grout,layout:f.spec.layout,labels:lb});
   f.excl.forEach(e=>{
     ctx.fillStyle='#F7F7F5';ctx.fillRect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX);
     ctx.strokeStyle='#8BB4D4';ctx.lineWidth=1.2;ctx.strokeRect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX);
@@ -3141,6 +3143,29 @@ function calculateWallTiles(){
   const order=Math.ceil((full+sources)*(1+p.wallWaste/100));
   return{full,cut:cuts.length,sources,order};
 }
+// 壁磚編號（與地磚相同規則）：整磚依牆面順序 1、2、3…，裁切磚接續編號，同一片磚切兩塊標 a／b（可能跨不同牆面）
+// 浴缸半牆／檯面另外編號，前面加 T
+function wallNumbering(){
+  const p=P(),d=innerDim(),H=p.wallH*10,out={};
+  let n=0;const cuts=[];
+  wallSegs(p,d).forEach(seg=>{
+    const o=segOrigin(seg,p),ex=wallObsExclusions(seg.key,seg.len,H);
+    const arr=out['seg:'+seg.key]=[];
+    layoutSurface(seg.len,H,o.x,o.y,p.wallTileW,p.wallTileH,p.wallGrout,p.wallLayout,ex).forEach((pc,i)=>{
+      if(pc.isPartial){cuts.push(pc);arr.push(pc);}else{n++;arr.push(String(n));}
+    });
+  });
+  pairCuts(cuts,n);
+  Object.values(out).forEach(arr=>arr.forEach((v,i)=>{if(typeof v!=='string')arr[i]=v.label;}));
+  // 浴缸面：依磚種分組編號
+  const groups={};
+  tubFaces().forEach(f=>{const g=groups[f.spec.key]||(groups[f.spec.key]={n:0,cuts:[],faces:[]});
+    const arr=out['tub:'+f.s.id+':'+f.edge]=[];
+    faceLayout(f).forEach(pc=>{if(pc.isPartial){g.cuts.push(pc);arr.push(pc);}else{g.n++;arr.push(String(g.n));}});
+    g.faces.push(arr);});
+  Object.values(groups).forEach(g=>{pairCuts(g.cuts,g.n);g.faces.forEach(arr=>arr.forEach((v,i)=>{arr[i]='T'+(typeof v==='string'?v:v.label);}));});
+  return out;
+}
 function updateWallStats(){
   const r=calculateWallTiles();
   document.getElementById('wallStatFull').textContent=r.full;
@@ -3158,7 +3183,8 @@ function drawTileSurface(surfX,surfY,surfW,surfH,originSX,originSY,flipX,flipY,e
   const tLay=tileOvr?tileOvr.layout:p.layout;
   ctx.fillStyle='#FFF';ctx.fillRect(surfX,surfY,surfW*PX,surfH*PX);
   ctx.save();ctx.beginPath();ctx.rect(surfX,surfY,surfW*PX,surfH*PX);ctx.clip();
-  layoutSurface(surfW,surfH,originSX,originSY,tW,tH,tG,tLay,exclusions).forEach(pc=>{
+  const labels=tileOvr&&tileOvr.labels;
+  layoutSurface(surfW,surfH,originSX,originSY,tW,tH,tG,tLay,exclusions).forEach((pc,i)=>{
     const px=surfX+(flipX?surfW-pc.x-pc.cw:pc.x)*PX;
     const py=surfY+(flipY?surfH-pc.y-pc.ch:pc.y)*PX;
     const pw=pc.cw*PX,ph=pc.ch*PX;
@@ -3169,6 +3195,13 @@ function drawTileSurface(surfX,surfY,surfW,surfH,originSX,originSY,flipX,flipY,e
     } else {
       ctx.strokeStyle='#C0BCB4';ctx.lineWidth=0.5;
       ctx.strokeRect(px+.5,py+.5,pw-1,ph-1);
+      // 磚片編號（與地磚圖相同樣式）
+      if(labels&&labels[i]&&pw>14&&ph>10){
+        ctx.fillStyle=pc.isPartial&&state.showCut!==false?'#8B5E3C':'#8A8780';
+        const fs=Math.min(10,Math.min(pw,ph)*.32);
+        ctx.font=`${fs}px DM Mono,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(labels[i],px+pw/2,py+ph/2);
+      }
     }
   });
   ctx.restore();
@@ -3203,10 +3236,15 @@ function wallObsExclusions(wallKey, surfW, wallHmm){
 function drawElevation(seg,X,Y,p,PX,wallHmm,wallTP){
   const o=segOrigin(seg,p);
   const excl=wallObsExclusions(seg.key,seg.len,wallHmm);
-  drawTileSurface(X,Y,seg.len,wallHmm,o.x,o.y,false,false,excl,wallTP);
+  const lb=!state._skipStk&&state._wallNums?state._wallNums['seg:'+seg.key]:null;
+  drawTileSurface(X,Y,seg.len,wallHmm,o.x,o.y,false,false,excl,lb?{...wallTP,labels:lb}:wallTP);
   excl.forEach(e=>{
     const ex=X+e.x1*PX,ey=Y+e.y1*PX,ew=(e.x2-e.x1)*PX,eh=(e.y2-e.y1)*PX;
-    if(e.type==='tub'){ctx.fillStyle='#F1EFEA';ctx.fillRect(ex,ey,ew,eh);return;}
+    if(e.type==='tub'){ // 缸緣以下：不貼磚，用斜線標示
+      ctx.save();ctx.fillStyle='#F4F2EE';ctx.fillRect(ex,ey,ew,eh);
+      ctx.beginPath();ctx.rect(ex,ey,ew,eh);ctx.clip();ctx.strokeStyle='#BDB6AA';ctx.lineWidth=0.8;ctx.setLineDash([]);
+      for(let i=-eh;i<ew;i+=7){ctx.beginPath();ctx.moveTo(ex+i,ey+eh);ctx.lineTo(ex+i+eh,ey);ctx.stroke();}
+      ctx.restore();return;}
     if(e.type==='door')drawDoorElev(ex,ey,ew,eh,PX,e.hingeL);else drawWindowElev(ex,ey,ew,eh,PX);
   });
   if(!state._skipStk)drawWallStickersOnFace(seg.key,X,Y,seg.len,wallHmm,seg.flip,PX);
@@ -3350,6 +3388,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 // ---- WALL VIEW — 主角立面 + 左右側翼（牆厚）----
 // 依牆面順時針循環（矩形 A→B→C→D；L 型含 E/F），按 ‹ › 切換
 function renderWallView(){
+  state._wallNums=wallNumbering();
   const faces=allWallFaces();const cur=faces[state.wallFace%faces.length];
   if(cur&&cur.kind!=='wall'){renderTubFaceView(cur);return;}
   const p=P();const d=innerDim();
@@ -3465,6 +3504,7 @@ function drawOrgMark(x,y,X,Y,W,H){
 // 地板居中，每面牆從自己與地板的交接線往外翻，地板線貼著地板邊緣
 // 牆面內容與壁磚圖的立面完全相同（只是旋轉擺放）
 function renderUnfoldView(){
+  state._wallNums=wallNumbering();
   const p=P();const d=innerDim();
   const PX=PXpm();
   const wallHmm=p.wallH*10;
