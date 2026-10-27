@@ -244,92 +244,28 @@ canvas{display:block}
     </div><!-- /sb-body sbRoom -->
   </div>
 
-  <!-- 磁磚 -->
+  <!-- 地磚設定（只顯示摘要，編輯用彈跳視窗） -->
   <div class="sb-collapsible">
-    <div class="sb-header" onclick="toggleSb('sbTile')">
+    <div class="sb-header" style="cursor:default" onclick="">
       <span class="sb-header-title">地磚設定</span>
-      <span class="sb-chevron" id="chevronsbTile">▼</span>
+      <button class="btn btn-sm" onclick="showTileModal('floor')">✎ 編輯</button>
     </div>
-    <div class="sb-body hidden" id="sbTile">
-    <div class="row">
-      <div class="field"><label>磚長 (cm)</label><input type="number" id="tileW" value="60" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
-      <div class="field"><label>磚寬 (cm)</label><input type="number" id="tileH" value="60" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
-      <div class="field" style="max-width:56px"><label>縫 (mm)</label><input type="number" id="grout" value="2" min="0" max="20" step="0.5" oninput="scheduleRender()"></div>
-    </div>
-    <div class="row">
-      <div class="field"><label>貼法</label>
-        <select id="layout" onchange="scheduleRender()">
-          <option value="straight">平貼</option>
-          <option value="half">1/2 交丁（橫）</option>
-          <option value="third">1/3 交丁（橫）</option>
-          <option value="half-v">1/2 交丁（直）</option>
-        </select>
-      </div>
-      <div class="field" style="max-width:68px"><label>損耗 (%)</label><input type="number" id="waste" value="0" min="0" max="30" oninput="scheduleRender()"></div>
-    </div>
-    </div><!-- /sb-body sbTile -->
+    <div class="sb-body" id="sbTile"><div id="floorTileSummary"></div></div>
   </div>
 
-  <!-- 壁磚設定 -->
+  <!-- 壁磚設定（只顯示摘要，編輯／新增用彈跳視窗） -->
   <div class="sb-collapsible">
-    <div class="sb-header" onclick="toggleSb('sbWallTile')">
+    <div class="sb-header" style="cursor:default" onclick="">
       <span class="sb-header-title">壁磚設定</span>
-      <span class="sb-chevron" id="chevronsbWallTile">▼</span>
+      <button class="btn btn-sm" onclick="showTileModal('wall')">✎ 編輯</button>
     </div>
-    <div class="sb-body hidden" id="sbWallTile">
-    <div class="row">
-      <div class="field"><label>磚長 (cm)</label><input type="number" id="wallTileW" value="120" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
-      <div class="field"><label>磚寬 (cm)</label><input type="number" id="wallTileH" value="60" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
-      <div class="field" style="max-width:56px"><label>縫 (mm)</label><input type="number" id="wallGrout" value="2" min="0" max="20" step="0.5" oninput="scheduleRender()"></div>
-    </div>
-    <div class="row">
-      <div class="field"><label>貼法</label>
-        <select id="wallLayout" onchange="scheduleRender()">
-          <option value="straight">平貼</option>
-          <option value="half">1/2 交丁（橫）</option>
-          <option value="third">1/3 交丁（橫）</option>
-          <option value="half-v">1/2 交丁（直）</option>
-        </select>
-      </div>
-      <div class="field" style="max-width:68px"><label>損耗 (%)</label><input type="number" id="wallWaste" value="0" min="0" max="30" oninput="scheduleRender()"></div>
-    </div>
+    <div class="sb-body" id="sbWallTile">
+    <div id="wallTileSummary"></div>
     <div style="font-size:11px;font-weight:600;color:var(--accent);margin:12px 0 4px">特殊磚 <span style="font-weight:400;color:var(--muted)">（某面牆或下半段改用不同的磚）</span></div>
     <div id="tileTypeList"></div>
     <button class="btn btn-sm" style="margin-top:4px" onclick="addTileType()">＋ 新增特殊磚</button>
     <div class="info-tip" style="margin-top:4px">新增後到壁磚圖，在上方「磚種」列指定哪一面（或下半段）使用。編號與磚量會依磚種分開計算。</div>
-    </div><!-- /sb-body sbWallTile -->
-  </div>
-
-  <!-- 起鋪點 -->
-  <div class="sb-collapsible">
-    <div class="sb-header" onclick="toggleSb('sbOrigin')">
-      <span class="sb-header-title">地磚起鋪點</span>
-      <span class="sb-chevron" id="chevronsbOrigin">▼</span>
     </div>
-    <div class="sb-body hidden" id="sbOrigin">
-    <div class="info-tip" style="margin-bottom:7px">在地磚圖按「設定起鋪點」→ 點選基準點（會吸附陽角／陰角／半牆）→ 用上方田字選整磚方向 → 用箭頭微調。下方可快速選房間的角或中點當基準。</div>
-    <div class="row" style="display:none">
-      <div class="field"><label>X (cm)</label><input type="number" id="originX" value="0" step="0.1" oninput="scheduleRender()"></div>
-      <div class="field"><label>Y (cm)</label><input type="number" id="originY" value="0" step="0.1" oninput="scheduleRender()"></div>
-    </div>
-    <div class="tag-row" style="margin-top:4px">
-      <span class="tag" onclick="snapOrigin('tl')">左上</span><span class="tag" onclick="snapOrigin('tc')">上中</span><span class="tag" onclick="snapOrigin('tr')">右上</span>
-      <span class="tag" onclick="snapOrigin('ml')">左中</span><span class="tag" onclick="snapOrigin('mc')">正中</span><span class="tag" onclick="snapOrigin('mr')">右中</span>
-      <span class="tag" onclick="snapOrigin('bl')">左下</span><span class="tag" onclick="snapOrigin('bc')">下中</span><span class="tag" onclick="snapOrigin('br')">右下</span>
-    </div>
-    </div><!-- /sb-body sbOrigin -->
-  </div>
-
-  <!-- 壁磚起鋪點（每面牆獨立） -->
-  <div class="sb-collapsible">
-    <div class="sb-header" onclick="toggleSb('sbWallOrigin')">
-      <span class="sb-header-title">壁磚起鋪點</span>
-      <span class="sb-chevron" id="chevronsbWallOrigin">▼</span>
-    </div>
-    <div class="sb-body hidden" id="sbWallOrigin">
-    <div class="info-tip" style="margin-bottom:6px">每面牆可選起磚方式；「自動」會從陽角起整磚。Y 為距天花板（cm）。也可在壁磚圖按「設定起鋪點」直接點選，會吸附陽角、陰角、缸緣與門窗邊。</div>
-    <div id="wallOrgList"></div>
-    </div><!-- /sb-body sbWallOrigin -->
   </div>
 
   <div class="sb-group-label">圖面標示</div>
@@ -505,6 +441,7 @@ canvas{display:block}
 
   <!-- 隱藏統計元素（供 JS 更新用） -->
   <div style="display:none">
+    <input type="number" id="originX" value="0" step="0.1" oninput="scheduleRender()"><input type="number" id="originY" value="0" step="0.1" oninput="scheduleRender()">
     <span id="statFull"></span>
     <span id="statCut"></span>
     <span id="statOrder"></span>
@@ -573,6 +510,69 @@ canvas{display:block}
     <div class="modal-btns">
       <button class="btn btn-sm" onclick="exportSummaryJPG()">另存 JPG</button>
       <button class="btn btn-sm btn-p" onclick="closeSummaryModal()">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- 地磚／壁磚設定 Modal -->
+<div class="modal-overlay hidden" id="tileModalFloor" onclick="if(event.target===this)closeTileModal()">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-title">地磚設定</div>
+    <div class="row">
+      <div class="field"><label>磚長 (cm)</label><input type="number" id="tileW" value="60" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
+      <div class="field"><label>磚寬 (cm)</label><input type="number" id="tileH" value="60" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
+      <div class="field" style="max-width:70px"><label>縫 (mm)</label><input type="number" id="grout" value="2" min="0" max="20" step="0.5" oninput="scheduleRender()"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>貼法</label>
+        <select id="layout" onchange="scheduleRender()"><option value="straight">平貼</option><option value="half">1/2 交丁（橫）</option><option value="third">1/3 交丁（橫）</option><option value="half-v">1/2 交丁（直）</option></select>
+      </div>
+      <div class="field" style="max-width:80px"><label>損耗 (%)</label><input type="number" id="waste" value="0" min="0" max="30" oninput="scheduleRender()"></div>
+    </div>
+    <div class="modal-btns" style="margin-top:14px"><button class="btn btn-sm btn-p" onclick="closeTileModal()">完成</button></div>
+  </div>
+</div>
+<div class="modal-overlay hidden" id="tileModalWall" onclick="if(event.target===this)closeTileModal()">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-title">壁磚設定</div>
+    <div class="row">
+      <div class="field"><label>磚長 (cm)</label><input type="number" id="wallTileW" value="120" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
+      <div class="field"><label>磚寬 (cm)</label><input type="number" id="wallTileH" value="60" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
+      <div class="field" style="max-width:70px"><label>縫 (mm)</label><input type="number" id="wallGrout" value="2" min="0" max="20" step="0.5" oninput="scheduleRender()"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>貼法</label>
+        <select id="wallLayout" onchange="scheduleRender()"><option value="straight">平貼</option><option value="half">1/2 交丁（橫）</option><option value="third">1/3 交丁（橫）</option><option value="half-v">1/2 交丁（直）</option></select>
+      </div>
+      <div class="field" style="max-width:80px"><label>損耗 (%)</label><input type="number" id="wallWaste" value="0" min="0" max="30" oninput="scheduleRender()"></div>
+    </div>
+    <div class="modal-btns" style="margin-top:14px"><button class="btn btn-sm btn-p" onclick="closeTileModal()">完成</button></div>
+  </div>
+</div>
+<!-- 特殊磚 新增／編輯 Modal -->
+<div class="modal-overlay hidden" id="ttModal" onclick="if(event.target===this)closeTileTypeModal(true)">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-title" id="ttTitle">特殊磚</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <input type="color" id="ttColor" title="圖面顏色" style="width:30px;height:26px;padding:0;border:none;flex:none" oninput="ttApply()">
+      <span id="ttCode" style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);flex:none"></span>
+      <input type="text" id="ttName" placeholder="名稱（例：黑色腰帶磚）" style="flex:1;min-width:0" oninput="ttApply()">
+    </div>
+    <div class="row">
+      <div class="field"><label>磚長 (cm)</label><input type="number" id="ttW" step="0.1" min="1" oninput="ttApply()"></div>
+      <div class="field"><label>磚寬 (cm)</label><input type="number" id="ttH" step="0.1" min="1" oninput="ttApply()"></div>
+      <div class="field" style="max-width:70px"><label>縫 (mm)</label><input type="number" id="ttGrout" step="0.5" min="0" oninput="ttApply()"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>貼法</label>
+        <select id="ttLayout" onchange="ttApply()"><option value="straight">平貼</option><option value="half">1/2 交丁（橫）</option><option value="third">1/3 交丁（橫）</option><option value="half-v">1/2 交丁（直）</option></select>
+      </div>
+      <div class="field" style="max-width:80px"><label>損耗 (%)</label><input type="number" id="ttWaste" min="0" max="30" oninput="ttApply()"></div>
+    </div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn btn-sm btn-d" id="ttDel" onclick="delTileTypeFromModal()">刪除</button>
+      <button class="btn btn-sm" id="ttCancel" onclick="closeTileTypeModal(true)">取消</button>
+      <button class="btn btn-sm btn-p" onclick="closeTileTypeModal(false)">完成</button>
     </div>
   </div>
 </div>
@@ -813,7 +813,8 @@ canvas{display:block}
     <span style="display:flex;align-items:center;gap:3px">微調
       <button class="btn btn-sm obn" title="往左" onclick="obNudge(-1,0)">←</button><button class="btn btn-sm obn" title="往上" onclick="obNudge(0,1)">↑</button><button class="btn btn-sm obn" title="往下" onclick="obNudge(0,-1)">↓</button><button class="btn btn-sm obn" title="往右" onclick="obNudge(1,0)">→</button>
       每次<input id="obStep" type="number" step="0.5" min="0.1" value="5" style="width:52px;flex:none;padding:3px 6px">cm
-      <button class="btn btn-sm" title="偏移歸零，回到基準點" onclick="obResetOff()">歸零</button></span>
+      <button class="btn btn-sm" title="偏移歸零，回到基準點" onclick="obResetOff()">歸零</button>
+      <button class="btn btn-sm" title="清除這一面的起鋪點設定，回到預設排法" onclick="obClearAnchor()">恢復預設</button></span>
     <button class="btn btn-sm" id="obRot" style="display:none" onclick="obRotate()"></button>
     <span id="obInfo" style="font-size:11px;flex-basis:100%"></span>
   </div>
@@ -1430,7 +1431,7 @@ function updateWallFaceLbl(){
   if(el)el.textContent=(fs[state.wallFace%fs.length]||fs[0]).label;
 }
 
-const ALL_SB_IDS=['sbRoom','sbTile','sbWallTile','sbOrigin','sbWallOrigin','sbObs','sbSticker','sbProc'];
+const ALL_SB_IDS=['sbRoom','sbObs','sbSticker','sbProc'];
 function toggleSb(id){
   const isHidden=document.getElementById(id).classList.contains('hidden');
   // 收合全部
@@ -1788,6 +1789,13 @@ function obSetQ(q){const o=orgRaw(state.orgSel);o.q=q;orgStore(state.orgSel,o);}
 function obNudge(sx,sy){
   const st=Math.abs(+document.getElementById('obStep').value||5),o=orgRaw(state.orgSel);
   o.dx=(o.dx||0)+sx*st;o.dy=(o.dy||0)+sy*st;orgStore(state.orgSel,o);
+}
+function obClearAnchor(){
+  const id=state.orgSel;if(!id)return;const [k,a,b]=id.split(':');
+  if(id==='floor'){state.floorOrg=null;const x=document.getElementById('originX'),y=document.getElementById('originY');if(x)x.value=0;if(y)y.value=0;}
+  else if(k==='seg'){if(state.wallOrgs)delete state.wallOrgs[a];}
+  else{const t=state.stickers.find(x=>String(x.id)===a);if(t&&t.faceOrgs){delete t.faceOrgs[b];if(t.selected)renderTubOrgs(t);}}
+  scheduleRender();setTimeout(()=>updateOrgBar(true),20);
 }
 function obResetOff(){const o=orgRaw(state.orgSel);o.dx=0;o.dy=0;orgStore(state.orgSel,o);}
 function updateFtBar(force){
@@ -2804,7 +2812,7 @@ function updateConflicts(){
   document.getElementById('cfList').innerHTML=list.map(c=>`<div style="padding:5px 2px;border-bottom:1px solid var(--border);font-size:12px;color:${c.lvl==='err'?'#B3261E':'#8A4B0F'};white-space:normal">• ${c.msg}</div>`).join('');
 }
 function render(){
-  enforceTubInside();updateConflicts();
+  refreshTileSummary();enforceTubInside();updateConflicts();
   if(state.space&&!state.spaceDone&&document.getElementById('spaceCanvas')){renderSpacePreview();return;}
   if(state.view==='wall'){renderWallView();return;}
   if(state.view==='unfold'){
@@ -3390,6 +3398,7 @@ function renderTubFaceView(f){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#EEF4F5';ctx.fillRect(0,0,canvas.width,canvas.height);
   const X=PAD+DIMW,Y=PAD+LBLH;
+  state._exRight=X+wPX;
   drawTubFaceSurface(f,X,Y,PX);
   state._wHits=[{kind:'tub',face:f,X,Y,w:f.w,h:f.h,PX}];
   if(f.kind==='apron'){
@@ -3445,11 +3454,13 @@ function tileTypeSpec(code){
   const t=(state.tileTypes||[]).find(t=>t.code===code);if(!t)return null;
   return{key:t.code,code:t.code,name:t.name||t.code,tileW:(+t.w||60)*10,tileH:(+t.h||60)*10,grout:+t.grout||0,layout:t.layout||'straight',waste:+t.waste||0,color:t.color};
 }
+const LAYOUT_NAME={straight:'平貼',half:'1/2 交丁（橫）',third:'1/3 交丁（橫）','half-v':'1/2 交丁（直）'};
 function addTileType(){
   state.tileTypes=state.tileTypes||[];
   let i=1;while(state.tileTypes.some(t=>t.code==='S'+i))i++;
   state.tileTypes.push({code:'S'+i,name:'特殊磚'+i,w:60,h:60,grout:2,layout:'straight',waste:0,color:TT_COLORS[(i-1)%TT_COLORS.length]});
   renderTileTypes();updateFtBar(true);scheduleRender();
+  openTileTypeModal('S'+i,true);
 }
 function setTileType(code,f,v){const t=(state.tileTypes||[]).find(t=>t.code===code);if(!t)return;t[f]=v;if(f==='name')updateFtBar(true);scheduleRender();}
 function delTileType(code){
@@ -3457,26 +3468,56 @@ function delTileType(code){
   Object.values(state.faceTiles||{}).forEach(c=>{if(c.type===code)c.type='main';if(c.lower===code)c.lower='main';});
   renderTileTypes();updateFtBar(true);scheduleRender();
 }
+// 側欄只顯示摘要；編輯／新增都在彈跳視窗
+function tileSummaryHtml(w,h,g,lay,waste){
+  return `<div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)">${w} × ${h} <span style="font-size:11px;font-weight:400;color:var(--muted)">cm</span></div>
+    <div class="info-tip" style="margin-top:2px">縫 ${g} mm　・　${LAYOUT_NAME[lay]||lay}　・　損耗 ${waste}%</div>`;
+}
+function refreshTileSummary(){
+  const f=document.getElementById('floorTileSummary'),w=document.getElementById('wallTileSummary');if(!f||!w)return;
+  const p=_Praw();
+  f.innerHTML=tileSummaryHtml(p.tileW/10,p.tileH/10,p.grout,p.layout,p.waste);
+  w.innerHTML=tileSummaryHtml(p.wallTileW/10,p.wallTileH/10,p.wallGrout,p.wallLayout,p.wallWaste);
+}
+function showTileModal(kind){document.getElementById(kind==='wall'?'tileModalWall':'tileModalFloor').classList.remove('hidden');}
+function closeTileModal(){['tileModalFloor','tileModalWall'].forEach(id=>document.getElementById(id).classList.add('hidden'));refreshTileSummary();scheduleRender();}
 function renderTileTypes(){
   const el=document.getElementById('tileTypeList');if(!el)return;
-  const LN={straight:'平貼',half:'1/2 交丁（橫）',third:'1/3 交丁（橫）','half-v':'1/2 交丁（直）'};
-  el.innerHTML=(state.tileTypes||[]).map(t=>`<div style="border-top:1px solid var(--border);padding:6px 0 4px">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-      <input type="color" value="${t.color}" title="圖面顏色" style="width:26px;height:22px;padding:0;border:none;flex:none" oninput="setTileType('${t.code}','color',this.value)">
-      <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent);flex:none">${t.code}</span>
-      <input type="text" value="${(t.name||'').replace(/"/g,'&quot;')}" placeholder="名稱（例：黑色腰帶磚）" style="flex:1;min-width:0;padding:3px 6px" oninput="setTileType('${t.code}','name',this.value)">
+  el.innerHTML=(state.tileTypes||[]).map(t=>`<div class="obs-item" style="cursor:default">
+    <div class="obs-dot" style="background:${t.color}"></div>
+    <div class="obs-info"><div class="obs-name"><span style="font-family:var(--mono);color:var(--accent)">${t.code}</span>　${(t.name||'').replace(/</g,'&lt;')}</div>
+      <div class="obs-dim">${t.w}×${t.h} cm・縫 ${t.grout} mm・${LAYOUT_NAME[t.layout]||''}・損耗 ${t.waste||0}%</div></div>
+    <div class="item-actions">
+      <button class="item-btn edit" title="編輯" onclick="openTileTypeModal('${t.code}')">✎</button>
       <button class="item-btn del" title="刪除" onclick="delTileType('${t.code}')">✕</button>
-    </div>
-    <div class="row">
-      <div class="field"><label>磚長 (cm)</label><input type="number" step="0.1" min="1" value="${t.w}" oninput="setTileType('${t.code}','w',+this.value||1)"></div>
-      <div class="field"><label>磚寬 (cm)</label><input type="number" step="0.1" min="1" value="${t.h}" oninput="setTileType('${t.code}','h',+this.value||1)"></div>
-      <div class="field" style="max-width:52px"><label>縫 (mm)</label><input type="number" step="0.5" min="0" value="${t.grout}" oninput="setTileType('${t.code}','grout',+this.value||0)"></div>
-    </div>
-    <div class="row">
-      <div class="field"><label>貼法</label><select onchange="setTileType('${t.code}','layout',this.value)">${Object.entries(LN).map(([v,l])=>`<option value="${v}" ${v===t.layout?'selected':''}>${l}</option>`).join('')}</select></div>
-      <div class="field" style="max-width:64px"><label>損耗 (%)</label><input type="number" min="0" max="30" value="${t.waste||0}" oninput="setTileType('${t.code}','waste',+this.value||0)"></div>
     </div></div>`).join('')||'<div class="info-tip">尚未新增特殊磚。</div>';
 }
+let _ttEdit=null,_ttNew=false;
+function openTileTypeModal(code,isNew){
+  const t=(state.tileTypes||[]).find(t=>t.code===code);if(!t)return;
+  _ttEdit=code;_ttNew=!!isNew;
+  document.getElementById('ttTitle').textContent=isNew?'新增特殊磚':'編輯特殊磚';
+  document.getElementById('ttCode').textContent=t.code;
+  document.getElementById('ttName').value=t.name||'';document.getElementById('ttColor').value=t.color||'#C9DCEB';
+  document.getElementById('ttW').value=t.w;document.getElementById('ttH').value=t.h;document.getElementById('ttGrout').value=t.grout;
+  document.getElementById('ttLayout').value=t.layout||'straight';document.getElementById('ttWaste').value=t.waste||0;
+  document.getElementById('ttCancel').style.display=isNew?'':'none';
+  document.getElementById('ttDel').style.display=isNew?'none':'';
+  document.getElementById('ttModal').classList.remove('hidden');
+}
+function ttApply(){
+  const t=(state.tileTypes||[]).find(t=>t.code===_ttEdit);if(!t)return;
+  t.name=document.getElementById('ttName').value;t.color=document.getElementById('ttColor').value;
+  t.w=+document.getElementById('ttW').value||1;t.h=+document.getElementById('ttH').value||1;
+  t.grout=Math.max(0,+document.getElementById('ttGrout').value||0);t.layout=document.getElementById('ttLayout').value;
+  t.waste=+document.getElementById('ttWaste').value||0;
+  renderTileTypes();updateFtBar(true);scheduleRender();
+}
+function closeTileTypeModal(cancel){
+  if(cancel&&_ttNew)delTileType(_ttEdit);
+  _ttEdit=null;_ttNew=false;document.getElementById('ttModal').classList.add('hidden');
+}
+function delTileTypeFromModal(){if(_ttEdit)delTileType(_ttEdit);closeTileTypeModal(false);}
 // 某一面的基本資料：尺寸、開口、主磚規格
 function faceBase(id){
   const p=P(),[k,a,b]=id.split(':');
@@ -3979,6 +4020,7 @@ function renderWallView(){
   ctx.fillStyle='#EEF4F5';ctx.fillRect(0,0,canvas.width,canvas.height);
 
   const top=PAD+LBLH,mw=flankPX+mainPX+flankPX,ox=DIMW+(cw-DIMW-mw-RG-retW)/2;
+  state._exRight=ox+mw+RG+retW;
   const lX=ox, mX=ox+flankPX, rX=ox+flankPX+mainPX;
   const hatch=(x0,y0,w,h)=>{ctx.save();ctx.fillStyle='#5E6264';ctx.fillRect(x0,y0,w,h);
     ctx.beginPath();ctx.rect(x0,y0,w,h);ctx.clip();ctx.strokeStyle='#4D5153';ctx.lineWidth=0.5;
@@ -5206,6 +5248,27 @@ function showExportModal(){
 }
 function closeExportModal(){document.getElementById('exportModal').classList.add('hidden');}
 function dlDataUrl(url,name){const a=document.createElement('a');a.download=name;a.href=url;document.body.appendChild(a);a.click();a.remove();}
+// 壁磚圖匯出：把「立面位置」3D 小圖貼在圖面內容右上角旁（緊貼內容，不留大空白）
+function withMiniMap(cv){
+  try{
+    if(!miniInit()||!renderMini3D())return cv;
+    const gl=MINI.r.domElement,lb=document.getElementById('miniLbl');
+    const K=0.75,mw=Math.round(gl.width*K),mh=Math.round(gl.height*K),pad=12,GAP=16,PADR=24;
+    const right=Math.min(cv.width,Math.ceil((state._exRight||cv.width)+PADR));
+    const W=right+GAP+mw+pad*2+PADR,H=Math.max(cv.height,mh+pad*2+24+8);
+    const o=document.createElement('canvas');o.width=W;o.height=H;const c=o.getContext('2d');
+    c.fillStyle='#EEF4F5';c.fillRect(0,0,W,H);
+    c.drawImage(cv,0,0,right,cv.height,0,0,right,cv.height);
+    const bx=right+GAP,by=PADR;
+    c.fillStyle='rgba(255,255,255,.94)';c.strokeStyle='#C9DBDE';c.lineWidth=1;
+    roundRect(c,bx,by,mw+pad*2,mh+pad*2+16,8);c.fill();c.stroke();
+    c.fillStyle='#5F7678';c.font='12px "Noto Sans TC",sans-serif';c.textAlign='left';c.textBaseline='top';
+    c.fillText('立面位置',bx+pad,by+8);
+    c.drawImage(gl,bx+pad,by+pad+16,mw,mh);   // 需在 render 後立刻讀取
+    c.drawImage(lb,bx+pad,by+pad+16,mw,mh);
+    return o;
+  }catch(e){return cv;}
+}
 async function runExport(){
   const fmt=document.getElementById('exFmt').value,ext=fmt==='jpg'?'jpg':'png',mime=fmt==='jpg'?'image/jpeg':'image/png';
   const want={unfold:document.getElementById('exUnfold').checked,floor:document.getElementById('exFloor').checked,wall:document.getElementById('exWall').checked};
@@ -5231,7 +5294,7 @@ async function runExport(){
       const faces=allWallFaces(),idxs=document.getElementById('exWallScope').value==='all'?faces.map((f,i)=>i):[keep.wallFace%faces.length];
       idxs.forEach(i=>{state.wallFace=i;renderWallView();
         const lbl=String(faces[i].label||i+1).replace(/[\\\/:*?"<>|\s]+/g,'_');
-        files.push({url:grab(canvas),name:'磁磚放樣_壁磚圖_'+lbl+'.'+ext});});
+        files.push({url:grab(withMiniMap(canvas)),name:'磁磚放樣_壁磚圖_'+lbl+'.'+ext});});
     }
   }catch(err){msg.textContent='匯出失敗：'+err.message;}
   finally{
