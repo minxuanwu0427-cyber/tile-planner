@@ -493,7 +493,7 @@ canvas{display:block}
       <span class="sb-chevron" id="chevronsbProc">▼</span>
     </div>
     <div class="sb-body hidden" id="sbProc">
-    <div class="info-tip" style="margin-bottom:7px">切換「加工標記」模式，點選磚片邊緣。</div>
+    <div class="info-tip" style="margin-bottom:7px">在地磚圖、壁磚圖或 3D 圖按「加工標記」，滑鼠移到磚邊會先預覽，點擊標記；同種類再點一次可取消。3D 中拖曳空白處仍可旋轉。</div>
     <div class="tag-row" id="procTypeTags" style="margin-bottom:8px">
       <span class="tag active" data-proc="工廠背斜切" onclick="selProcType(this,'工廠背斜切')">工廠背斜切</span>
       <span class="tag" data-proc="現場導角" onclick="selProcType(this,'現場導角')">現場導角</span>
@@ -732,9 +732,14 @@ canvas{display:block}
     <!-- 壁磚圖導覽（切換主角面） -->
     <span id="v3dCtrl" style="display:none;align-items:center;gap:8px">
       <button class="btn btn-sm" onclick="if(V3.renderer){reset3DView();draw3D();}">重設視角</button>
+      <button class="mode-btn" id="mode3dProc" onclick="setMode(state.mode==='proc'?'select':'proc')">加工標記</button>
+      <span id="proc3dType" style="display:none;align-items:center;gap:4px;font-size:12px">
+        <select onchange="state.procType=this.value;document.querySelectorAll('#procTypeTags .tag').forEach(t=>t.classList.toggle('active',t.dataset.proc===this.value))" style="width:auto;padding:3px 6px">
+          <option value="工廠背斜切">工廠背斜切</option><option value="現場導角">現場導角</option></select>
+      </span>
       <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" checked onchange="V3.hideFront=this.checked;draw3D()">隱藏前方牆面</label>
       <span id="placeHint" style="display:none;align-items:center;padding:3px 8px;border-radius:4px;background:#2F7BD8;color:#fff;font-size:12px"></span>
-      <span class="info-tip" title="拖曳空白處旋轉・拖曳設備移動・右鍵或 Shift 拖曳平移・滾輪縮放・Delete 刪除">拖曳旋轉・右鍵平移・滾輪縮放・Del 刪除</span>
+      <span class="info-tip" id="v3dHelp" title="拖曳空白處旋轉・拖曳設備移動・右鍵或 Shift 拖曳平移・滾輪縮放・Delete 刪除">拖曳旋轉・右鍵平移・滾輪縮放・Del 刪除</span>
     </span>
     <span id="wallNavCtrl" style="display:none;align-items:center;gap:6px">
       <button class="btn btn-sm" onclick="changeWallFace(-1)" style="padding:4px 10px;font-size:16px;line-height:1">‹</button>
@@ -1368,7 +1373,7 @@ function setView(v){
   const floorCtrl=document.getElementById('floorModeCtrl');
   const wallCtrl=document.getElementById('wallNavCtrl');
   if(floorCtrl)floorCtrl.style.display=isFloor||isWall?'flex':'none';
-  {const pb=document.getElementById('modeProc');if(pb)pb.style.display=isFloor?'':'none';}
+  {const pb=document.getElementById('modeProc');if(pb)pb.style.display='';}
   if(wallCtrl)wallCtrl.style.display=isWall?'flex':'none';
   const v3c=document.getElementById('v3dCtrl');
   if(v3c)v3c.style.display=v==='unfold'?'flex':'none';
@@ -1377,7 +1382,8 @@ function setView(v){
     document.getElementById('fc').style.display='block';
     document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';
   }
-  if(!(isFloor||(isWall&&state.mode==='origin'))&&state.mode!=='select')setMode('select');
+  if(!(isFloor||(isWall&&(state.mode==='origin'||state.mode==='proc'))||(v==='unfold'&&state.mode==='proc'))&&state.mode!=='select')setMode('select');
+  state.procHover=null;if(typeof V3!=='undefined'&&V3.procObj){V3.procObj.visible=false;}
   updateWallFaceLbl();updateOrgBar();updateFtBar();renderMiniMap();
   scheduleRender();
 }
@@ -1655,6 +1661,18 @@ function faceSnapData(h){
   xs.forEach(a=>ys.forEach(b=>{if(!pts.some(q=>Math.abs(q.x-a.v)<1&&Math.abs(q.y-b.v)<1))pts.push({x:a.v,y:b.v,lbl:a.lbl===b.lbl?a.lbl:a.lbl+'・'+b.lbl});}));
   return{xs,ys,pts};
 }
+function wallProcAt(cx,cy){
+  const hs=state._wHits||[];const inR=(h,m)=>cx>=h.X-m&&cx<=h.X+h.w*h.PX+m&&cy>=h.Y-m&&cy<=h.Y+h.h*h.PX+m;
+  const h=hs.find(h=>inR(h,0))||hs.find(h=>inR(h,8));if(!h)return null;
+  const face=h.kind==='seg'?'seg:'+h.seg.key:'tub:'+h.face.s.id+':'+h.face.edge;
+  const e=edgeNear(facePieces(face),(cx-h.X)/h.PX,(cy-h.Y)/h.PX,10/h.PX);
+  return e?{face,e,h}:null;
+}
+function drawWallProcHover(){
+  const r=state.procHover;if(!r||state.mode!=='proc'||r.face==='floor')return;
+  const h=(state._wHits||[]).find(h=>(h.kind==='seg'?'seg:'+h.seg.key:'tub:'+h.face.s.id+':'+h.face.edge)===r.face);if(!h)return;
+  drawProcPreview(h.X+r.e.x1*h.PX,h.Y+r.e.y1*h.PX,h.X+r.e.x2*h.PX,h.Y+r.e.y2*h.PX,r.face,r.e);
+}
 function wallSnapAt(cx,cy){
   const hs=state._wHits||[],pad=8;
   const inR=(h,m)=>cx>=h.X-m&&cx<=h.X+h.w*h.PX+m&&cy>=h.Y-m&&cy<=h.Y+h.h*h.PX+m;
@@ -1835,7 +1853,12 @@ function setMode(m){
   state.mode=m;
   ['select','origin','proc'].forEach(x=>{document.getElementById('mode'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===m);});
   canvas.style.cursor=m==='origin'?'crosshair':m==='proc'?'cell':'default';
-  state.snapHover=null;if(typeof scheduleRender==='function')scheduleRender();
+  {const b=document.getElementById('mode3dProc');if(b)b.classList.toggle('active',m==='proc');
+   const tg=document.getElementById('proc3dType');if(tg)tg.style.display=m==='proc'?'flex':'none';
+   const hp=document.getElementById('v3dHelp');if(hp)hp.style.display=m==='proc'?'none':'';
+   if(m!=='proc'){const ph=document.getElementById('placeHint');if(ph&&!(typeof V3!=='undefined'&&V3.placing))ph.style.display='none';}
+   if(typeof V3!=='undefined'&&V3.procObj){V3.procObj.visible=false;if(V3.renderer)draw3D();}}
+  state.snapHover=null;state.procHover=null;if(typeof scheduleRender==='function')scheduleRender();
 }
 
 function snapOrigin(pos){
@@ -2302,6 +2325,56 @@ function renderStickerList(){
 }
 
 // ---- PROC ----
+// ---- 加工標記：所有面（地板、牆、柱面、管道間面、半牆、檯面）都可標 ----
+// proc：{type, face:'floor'|'seg:KEY'|'tub:ID:EDGE', x1,y1,x2,y2（面內 mm）}；舊資料沒有 face＝地板
+const procFace=pr=>pr.face||'floor';
+function floorPiecesAll(){const p=P(),d=innerDim();return layoutSurface(d.iw*10,d.ih*10,p.originX*10,p.originY*10,p.tileW,p.tileH,p.grout,p.layout,floorExclusions(p,d));}
+function facePiecesAny(face){return face==='floor'?floorPiecesAll():facePieces(face);}
+// 找最近的磚邊（含裁切磚）
+function edgeNear(pieces,x,y,tol){
+  let best=null,bd=Infinity;
+  const segD=(e)=>{const vx=e.x2-e.x1,vy=e.y2-e.y1,L=vx*vx+vy*vy||1;let t=((x-e.x1)*vx+(y-e.y1)*vy)/L;t=Math.max(0,Math.min(1,t));return Math.hypot(x-(e.x1+vx*t),y-(e.y1+vy*t));};
+  for(const pc of pieces){
+    const X1=pc.x,Y1=pc.y,X2=pc.x+pc.cw,Y2=pc.y+pc.ch;
+    [{x1:X1,y1:Y1,x2:X2,y2:Y1},{x1:X1,y1:Y2,x2:X2,y2:Y2},{x1:X1,y1:Y1,x2:X1,y2:Y2},{x1:X2,y1:Y1,x2:X2,y2:Y2}].forEach(e=>{const dd=segD(e);if(dd<bd&&dd<tol){bd=dd;best=e;}});
+  }
+  return best;
+}
+function procEdgeAt(ix,iy){return edgeNear(state._tiles.map(t=>({x:t.x,y:t.y,cw:t.w,ch:t.h})),ix,iy,10/state.scale/0.28);}
+function procToggle(face,e){
+  const same=pr=>procFace(pr)===face&&sameEdge(pr,e);
+  const had=state.procs.find(same);
+  state.procs=state.procs.filter(pr=>!same(pr));
+  if(!(had&&had.type===state.procType))state.procs.push({type:state.procType,face,x1:e.x1,y1:e.y1,x2:e.x2,y2:e.y2});
+  renderProcList();scheduleRender();
+}
+function procHoverState(face,e){const had=state.procs.find(pr=>procFace(pr)===face&&sameEdge(pr,e));return{had,cancel:had&&had.type===state.procType};}
+// 2D 預覽：x1..y2 為畫布座標
+function drawProcPreview(x1,y1,x2,y2,face,e){
+  const col=PROC_COLORS[state.procType]||'#E24B4A',st=procHoverState(face,e);
+  ctx.save();ctx.lineCap='round';
+  ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.strokeStyle=col;ctx.globalAlpha=st.cancel?0.45:0.85;ctx.lineWidth=5;ctx.setLineDash(st.cancel?[5,4]:[]);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.globalAlpha=1;ctx.setLineDash([]);
+  const t=(st.cancel?'點擊取消：':st.had?'點擊改為：':'點擊標記：')+state.procType+`（${Math.round(Math.hypot(e.x2-e.x1,e.y2-e.y1))/10} cm）`;
+  ctx.font='11px Noto Sans TC,DM Mono,sans-serif';const w=ctx.measureText(t).width+10,mx=(x1+x2)/2,my=(y1+y2)/2;
+  let bx=mx+10,by=my-24;if(bx+w>canvas.width-4)bx=mx-10-w;if(by<4)by=my+8;
+  ctx.fillStyle='rgba(18,26,23,.85)';ctx.fillRect(bx,by,w,18);ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,bx+5,by+9);
+  ctx.restore();
+}
+// 在一個面上畫已標記的加工（X,Y＝面左上角畫布座標）
+function drawFaceProcs(face,X,Y,PXv){
+  (state.procs||[]).filter(pr=>procFace(pr)===face).forEach(pr=>{
+    const col=PROC_COLORS[pr.type]||'#E24B4A',x1=X+pr.x1*PXv,y1=Y+pr.y1*PXv,x2=X+pr.x2*PXv,y2=Y+pr.y2*PXv;
+    ctx.save();ctx.strokeStyle=col;ctx.lineCap='round';ctx.lineWidth=state._px?Math.max(3,25*PXv):3;ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    if(!state._px){const mx=(x1+x2)/2,my=(y1+y2)/2,dx=x2-x1,dy=y2-y1,l=Math.hypot(dx,dy)||1;
+      ctx.fillStyle=col;ctx.font='bold 9px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(pr.type==='工廠背斜切'?'斜':'角',mx-dy/l*9,my+dx/l*9);}
+    ctx.restore();
+  });
+}
+const sameEdge=(a,b)=>Math.abs(a.x1-b.x1)<1&&Math.abs(a.y1-b.y1)<1&&Math.abs(a.x2-b.x2)<1&&Math.abs(a.y2-b.y2)<1;
 function selProcType(el,type){document.querySelectorAll('#procTypeTags .tag').forEach(t=>t.classList.remove('active'));el.classList.add('active');state.procType=type;}
 function clearProcs(){state.procs=[];renderProcList();scheduleRender();}
 function renderProcList(){
@@ -2976,7 +3049,7 @@ function renderFloorView(){
   drawDeckOnFloor(tx,ty,wtmm,PX);
 
   // Proc marks
-  state.procs.forEach(proc=>{
+  state.procs.filter(pr=>procFace(pr)==='floor').forEach(proc=>{
     const col=PROC_COLORS[proc.type]||'#E24B4A';
     ctx.strokeStyle=col;ctx.lineWidth=3;ctx.setLineDash([]);
     const [x1,y1]=toCanvas(wtmm+proc.x1,wtmm+proc.y1);
@@ -2990,6 +3063,12 @@ function renderFloorView(){
     ctx.fillStyle=col;ctx.font='bold 9px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(proc.type==='工廠背斜切'?'斜':'角', mx+nx*offset, my+ny*offset);
   });
+
+  // 加工標記：滑鼠所在磚縫預覽
+  if(state.mode==='proc'&&state.procHover&&state.procHover.face==='floor'){
+    const h=state.procHover.e;const [x1,y1]=toCanvas(wtmm+h.x1,wtmm+h.y1),[x2,y2]=toCanvas(wtmm+h.x2,wtmm+h.y2);
+    drawProcPreview(x1,y1,x2,y2,'floor',h);
+  }
 
   // 起鋪點：基準點＋第一片整磚
   drawFirstTile(tx(wtmm),ty(wtmm),PX,orgRaw('floor'),p.tileW,p.tileH,innerWmm,innerHmm,true);
@@ -3300,7 +3379,7 @@ function renderTubFaceView(f){
   ctx.fillStyle='#7A776E';ctx.font='10px DM Mono,Noto Sans TC,monospace';ctx.textAlign='center';ctx.textBaseline='top';
   ctx.fillText(`${f.spec.name} ${f.spec.tileW/10}×${f.spec.tileH/10} cm`+(f.kind==='deck'?'　（上＝A 側）':''),X+wPX/2,Y+hPX+66);
   drawFirstTile(X,Y,PX,orgRaw('tub:'+f.s.id+':'+f.edge),f.spec.tileW,f.spec.tileH,f.w,f.h,true);
-  drawSnapHover();updateOrgBar();updateFtBar();renderMiniMap();
+  drawSnapHover();drawWallProcHover();updateOrgBar();updateFtBar();renderMiniMap();
 }
 // 壁磚圖切換清單：各面牆＋浴缸貼磚面
 function allWallFaces(){
@@ -3470,6 +3549,7 @@ function drawFacePieces(X,Y,base,pieces,labels){
     pieces.forEach((pc,i)=>{if(!labels[i])return;
       drawTileLabel(labels[i],pc,X,Y,PX,obs,pc.isPartial&&state.showCut!==false?'#8B5E3C':(pc.spec.color?'#4D5153':'#8A8780'));});
   }
+  drawFaceProcs(base.seg?'seg:'+base.seg.key:'tub:'+base.tub.s.id+':'+base.tub.edge,X,Y,PX);
   // 分段線
   const zs=faceZones(base.seg?'seg:'+base.seg.key:'tub:'+base.tub.s.id+':'+base.tub.edge,base);
   if(zs.length>1){const y=Y+zs[1].y0*PX;ctx.strokeStyle='#5E6264';ctx.lineWidth=1.4;ctx.setLineDash([6,3]);ctx.beginPath();ctx.moveTo(X,y);ctx.lineTo(X+base.w*PX,y);ctx.stroke();ctx.setLineDash([]);}
@@ -3846,7 +3926,7 @@ function renderWallView(){
   // 各段起鋪點標記
   state._wHits.forEach(h=>{const id='seg:'+h.seg.key;drawFirstTile(h.X,h.Y,h.PX,orgRaw(id),p.wallTileW,p.wallTileH,h.w,h.h,state.orgSel===id||state._wHits.length===1);
     if(state.orgSel==='seg:'+h.seg.key&&state._wHits.length>1){ctx.save();ctx.strokeStyle='#F07020';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.strokeRect(h.X-3,h.Y-3,h.w*h.PX+6,h.h*h.PX+6);ctx.restore();}});
-  drawSnapHover();updateOrgBar();updateFtBar();renderMiniMap();
+  drawSnapHover();drawWallProcHover();updateOrgBar();updateFtBar();renderMiniMap();
 }
 // 起鋪點標記（只畫在該面範圍內）
 function drawOrgMark(x,y,X,Y,W,H){
@@ -3983,7 +4063,7 @@ function init3D(){
       return;
     }
     // 點到障礙物或設備：選取並拖曳
-    if(e.button===0&&!e.shiftKey&&V3.ptrs.size===0){
+    if(e.button===0&&!e.shiftKey&&V3.ptrs.size===0&&state.mode!=='proc'){
       const pk=pickHit(e);
       if(pk){
         const it=findItem(pk.kind,pk.id);
@@ -4029,6 +4109,11 @@ function init3D(){
       moveByPointer(e,dg.kind,it,dg.isWall,dg.off);
       draw3D();return;
     }
+    if(state.mode==='proc'&&!V3.ptrs.size){
+      const r=proc3DAt(e),o=V3._procHov;
+      if(!!r!==!!o||(r&&o&&(r.face!==o.face||!sameEdge(r.e,o.e)))){V3._procHov=r;show3DProcHover(r);if(!r){const h=document.getElementById('placeHint');if(h&&!V3.placing)h.style.display='none';}draw3D();}
+      el.style.cursor=r?'pointer':'grab';return;
+    }
     const pt=V3.ptrs.get(e.pointerId);if(!pt)return;
     const dx=e.clientX-pt.x,dy=e.clientY-pt.y;
     if(V3.ptrs.size>=2){
@@ -4060,6 +4145,9 @@ function init3D(){
     const pt=V3.ptrs.get(e.pointerId);
     V3.ptrs.delete(e.pointerId);V3.pinch=null;if(!V3.ptrs.size)el.style.cursor='grab';
     // 點空白處：取消選取
+    if(pt&&!pt.pan&&e.type==='pointerup'&&Math.hypot(e.clientX-pt.sx,e.clientY-pt.sy)<4&&!V3.placing&&state.mode==='proc'){
+      const r=proc3DAt(e);if(r){procToggle(r.face,r.e);V3._procHov=null;show3DProcHover(null);const h=document.getElementById('placeHint');if(h)h.style.display='none';}return;
+    }
     if(pt&&!pt.pan&&e.type==='pointerup'&&Math.hypot(e.clientX-pt.sx,e.clientY-pt.sy)<4&&!V3.placing){
       if(state.obstacles.some(o=>o.selected)||state.stickers.some(s=>s.selected))deselectAll3D();
     }
@@ -4120,6 +4208,9 @@ function build3D(){
     drawTileSurface(0,0,iwmm,ihmm,p.originX*10,p.originY*10,false,false,floorExclusions(p,d),{tileW:p.tileW,tileH:p.tileH,grout:p.grout,layout:p.layout,labels:floorNumbering(),obs:floorObstacles(p,d)});
     smodel.outRects.forEach(r=>ctx.clearRect(r.x1*s,r.y1*s,(r.x2-r.x1)*s,(r.y2-r.y1)*s));
     ctx.fillStyle='#6E7274';smodel.cols.forEach(c=>{if(smodel.segs.some(g=>g.kind!=='wall'&&((g.axis==='h'&&(Math.abs(g.c-c.y1)<1||Math.abs(g.c-c.y2)<1))||(g.axis==='v'&&(Math.abs(g.c-c.x1)<1||Math.abs(g.c-c.x2)<1)))))ctx.fillRect(c.x1*s,c.y1*s,(c.x2-c.x1)*s,(c.y2-c.y1)*s);});
+    // 加工標記（3D 僅顯示）
+    (state.procs||[]).filter(pr=>procFace(pr)==='floor').forEach(pr=>{ctx.strokeStyle=PROC_COLORS[pr.type]||'#E24B4A';ctx.lineWidth=Math.max(3,25*s);ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(pr.x1*s,pr.y1*s);ctx.lineTo(pr.x2*s,pr.y2*s);ctx.stroke();});
     // 地面設備貼紙
     // 起鋪點
     const ox=p.originX*10*s,oy=p.originY*10*s,r=Math.max(4,12*s);
@@ -4595,6 +4686,53 @@ function wallHit(e){
   const lp=h.object.worldToLocal(h.point.clone());
   return{key:w.key,lx:lp.x,ly:lp.y};
 }
+// 3D 加工標記：射線打到的面（牆／柱面／管道間面、浴缸半牆與檯面、地板），回傳面內 mm 座標
+function proc3DAt(e){
+  setRay(e);V3.scene.updateMatrixWorld();
+  const p=P(),H=p.wallH,cands=[];
+  {const ms=V3.walls.filter(w=>w.mesh.visible).map(w=>w.mesh),h=_ray.intersectObjects(ms,false)[0];
+   if(h){const w=V3.walls.find(w=>w.mesh===h.object),lp=h.object.worldToLocal(h.point.clone());cands.push({dist:h.distance,face:'seg:'+w.key,x:lp.x*10,y:(H-lp.y)*10});}}
+  state.stickers.filter(s=>s.type==='bathtub'&&!s._placing).forEach(s=>{
+    const rec=V3.items&&V3.items.get('stk:'+s.id);if(!rec||!worldVisible(rec.obj))return;
+    const h=_ray.intersectObjects([rec.obj],true)[0];if(!h)return;
+    const r=stkFootprint(s),Ht=stkHeight(s),pt=h.point,mx=pt.x*10,my=pt.z*10;
+    if(pt.y>=Ht-0.8){if(tubDeckOn(s))cands.push({dist:h.distance,face:'tub:'+s.id+':deck',x:mx-r.x1,y:my-r.y1});return;}
+    const ds={n:Math.abs(my-r.y1),s:Math.abs(my-r.y2),w:Math.abs(mx-r.x1),e:Math.abs(mx-r.x2)},ex=tubExposedEdges(s);
+    const eg=ex.sort((a,b)=>ds[a]-ds[b])[0];if(!eg)return;
+    const fx=eg==='n'?r.x2-mx:eg==='s'?mx-r.x1:eg==='w'?my-r.y1:r.y2-my;
+    cands.push({dist:h.distance,face:'tub:'+s.id+':'+eg,x:fx,y:(Ht-pt.y)*10});
+  });
+  {const pt=floorHit(e);if(pt){const d=innerDim(),x=pt.x*10,y=pt.z*10;if(x>=0&&y>=0&&x<=d.iw*10&&y<=d.ih*10)cands.push({dist:V3.camera.position.distanceTo(pt),face:'floor',x,y});}}
+  cands.sort((a,b)=>a.dist-b.dist);const c=cands[0];if(!c)return null;
+  const tol=Math.max(20,c.dist*10*0.02);
+  const ed=edgeNear(facePiecesAny(c.face),c.x,c.y,tol);
+  return ed?{face:c.face,e:ed}:null;
+}
+// 面內 mm → 3D 世界座標
+function faceToWorld(face,x,y,lift){
+  lift=lift==null?0.6:lift;const p=P(),H=p.wallH;
+  if(face==='floor')return new THREE.Vector3(x/10,lift,y/10);
+  const [k,a,b]=face.split(':');
+  if(k==='seg'){const w=V3.walls.find(w=>w.key===a);if(!w)return null;return new THREE.Vector3(x/10,H-y/10,lift).applyMatrix4(w.mesh.matrixWorld);}
+  const s=state.stickers.find(t=>String(t.id)===a);if(!s)return null;
+  const r=stkFootprint(s),cx=(r.x1+r.x2)/20,cz=(r.y1+r.y2)/20,W=(r.x2-r.x1)/10,D=(r.y2-r.y1)/10,Ht=stkHeight(s),O=lift;
+  if(b==='deck')return new THREE.Vector3(cx+x/10-W/2,Ht+O,cz+y/10-D/2);
+  const yy=Ht-y/10;
+  return b==='e'?new THREE.Vector3(cx+W/2+O,yy,cz+D/2-x/10):b==='w'?new THREE.Vector3(cx-W/2-O,yy,cz-D/2+x/10)
+        :b==='s'?new THREE.Vector3(cx-W/2+x/10,yy,cz+D/2+O):new THREE.Vector3(cx+W/2-x/10,yy,cz-D/2-O);
+}
+function show3DProcHover(r){
+  if(!V3.procObj){V3.procObj=new THREE.Group();V3.scene.add(V3.procObj);}
+  const g=V3.procObj;while(g.children.length){const c=g.children.pop();c.geometry&&c.geometry.dispose();c.material&&c.material.dispose();}
+  if(!r){g.visible=false;return;}
+  const a=faceToWorld(r.face,r.e.x1,r.e.y1,0.9),b=faceToWorld(r.face,r.e.x2,r.e.y2,0.9);if(!a||!b){g.visible=false;return;}
+  const st=procHoverState(r.face,r.e),len=a.distanceTo(b);
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,len,8),new THREE.MeshBasicMaterial({color:new THREE.Color(PROC_COLORS[state.procType]||'#E24B4A'),transparent:true,opacity:st.cancel?0.35:0.9,depthTest:false}));
+  m.position.copy(a.clone().add(b).multiplyScalar(0.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize());m.renderOrder=30;
+  g.add(m);g.visible=true;
+  const hint=document.getElementById('placeHint');
+  if(hint){hint.style.display='inline-flex';hint.textContent=(st.cancel?'點擊取消：':st.had?'點擊改為：':'點擊標記：')+state.procType+`（${Math.round(Math.hypot(r.e.x2-r.e.x1,r.e.y2-r.e.y1))/10} cm）`;}
+}
 function worldVisible(o){while(o){if(!o.visible)return false;o=o.parent;}return true;}
 function pickHit(e){
   setRay(e);V3.scene.updateMatrixWorld();
@@ -4792,6 +4930,9 @@ function hitTestSticker(s,ix,iy,p,d,wtmm){
 }
 
 canvas.addEventListener('mousedown',e=>{
+  if(state.view==='wall'&&state.mode==='proc'){
+    const rc=canvas.getBoundingClientRect(),r=wallProcAt(e.clientX-rc.left,e.clientY-rc.top);if(r)procToggle(r.face,r.e);return;
+  }
   if(state.view==='wall'&&state.mode==='origin'){
     const rc=canvas.getBoundingClientRect(),r=wallSnapAt(e.clientX-rc.left,e.clientY-rc.top);if(!r)return;
     const id=r.hit.kind==='seg'?'seg:'+r.hit.seg.key:'tub:'+r.hit.face.s.id+':'+r.hit.face.edge;
@@ -4853,30 +4994,23 @@ canvas.addEventListener('mousedown',e=>{
   }
 
   if(state.mode==='proc'){
-    const SNAP=10/state.scale/0.28;const iix=(ix-wtmm),iiy=(iy-wtmm);
-    let bestDist=Infinity,bestProc=null;
-    for(const tile of state._tiles){
-      if(tile.isPartial)continue;
-      const edges=[
-        {x1:tile.x,y1:tile.y,x2:tile.x+tile.w,y2:tile.y},
-        {x1:tile.x,y1:tile.y+tile.h,x2:tile.x+tile.w,y2:tile.y+tile.h},
-        {x1:tile.x,y1:tile.y,x2:tile.x,y2:tile.y+tile.h},
-        {x1:tile.x+tile.w,y1:tile.y,x2:tile.x+tile.w,y2:tile.y+tile.h},
-      ];
-      for(const edge of edges){
-        const mx=(edge.x1+edge.x2)/2,my=(edge.y1+edge.y2)/2;
-        const dist=Math.hypot(iix-mx,iiy-my);
-        if(dist<bestDist&&dist<SNAP){bestDist=dist;bestProc={type:state.procType,x1:edge.x1,y1:edge.y1,x2:edge.x2,y2:edge.y2};}
-      }
-    }
-    if(bestProc){
-      state.procs=state.procs.filter(pr=>!(Math.abs(pr.x1-bestProc.x1)<1&&Math.abs(pr.y1-bestProc.y1)<1&&Math.abs(pr.x2-bestProc.x2)<1&&Math.abs(pr.y2-bestProc.y2)<1));
-      state.procs.push(bestProc);renderProcList();scheduleRender();
-    }
+    const e=procEdgeAt(ix-wtmm,iy-wtmm);
+    if(e)procToggle('floor',e); // 同種類再點一次＝取消
   }
 });
 
 canvas.addEventListener('mousemove',e=>{
+  if(state.mode==='proc'&&state.view==='floor'){
+    const rc=canvas.getBoundingClientRect(),[wx,wy]=toWorld(e.clientX-rc.left,e.clientY-rc.top),wt=P().wallT*10;
+    const h=procEdgeAt(wx-wt,wy-wt),old=state.procHover;
+    if(!!h!==!!old||(h&&old&&!sameEdge(h,old.e))){state.procHover=h?{face:'floor',e:h}:null;scheduleRender();}
+    canvas.style.cursor=h?'pointer':'cell';return;
+  }
+  if(state.mode==='proc'&&state.view==='wall'){
+    const rc=canvas.getBoundingClientRect(),r=wallProcAt(e.clientX-rc.left,e.clientY-rc.top),old=state.procHover;
+    if(!!r!==!!old||(r&&old&&(r.face!==old.face||!sameEdge(r.e,old.e)))){state.procHover=r;scheduleRender();}
+    canvas.style.cursor=r?'pointer':'cell';return;
+  }
   if(state.mode==='origin'&&(state.view==='floor'||state.view==='wall')){
     const rc=canvas.getBoundingClientRect(),cx=e.clientX-rc.left,cy=e.clientY-rc.top;
     state.snapHover=state.view==='floor'?floorSnapAt(cx,cy):wallSnapAt(cx,cy);scheduleRender();return;
@@ -4910,7 +5044,7 @@ canvas.addEventListener('mousemove',e=>{
 });
 
 canvas.addEventListener('mouseup',()=>{state.dragging=null;});
-canvas.addEventListener('mouseleave',()=>{state.dragging=null;if(state.snapHover){state.snapHover=null;scheduleRender();}});
+canvas.addEventListener('mouseleave',()=>{state.dragging=null;if(state.snapHover||state.procHover){state.snapHover=null;state.procHover=null;scheduleRender();}});
 
 function zoom(d){if(is3D()){V3.radius=Math.max(30,V3.radius*(d>0?0.8:1.25));draw3D();return;}state.scale=Math.max(0.25,Math.min(5,state.scale+d));document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';scheduleRender();}
 function resetZoom(){
