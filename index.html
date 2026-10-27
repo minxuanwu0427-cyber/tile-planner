@@ -813,7 +813,11 @@ canvas{display:block}
       <span style="display:flex;gap:3px"><button class="item-btn" id="miniRotBtn" title="旋轉小圖" style="width:24px;height:20px;font-size:12px" onclick="state.miniRot=((state.miniRot||0)+1)%4;renderMiniMap()">⟳</button>
       <button class="item-btn" id="miniFoldBtn" title="收合／展開" style="width:24px;height:20px;font-size:12px" onclick="state.miniFold=!state.miniFold;renderMiniMap()">–</button></span>
     </div>
-    <canvas id="miniCv" style="width:200px;height:156px;display:block;cursor:pointer"></canvas>
+    <div id="miniBox" style="position:relative;width:200px;height:156px">
+      <canvas id="miniCv" style="width:200px;height:156px;display:block;cursor:pointer"></canvas>
+      <div id="miniGL" style="position:absolute;inset:0;display:none;cursor:pointer"></div>
+      <canvas id="miniLbl" style="position:absolute;inset:0;width:200px;height:156px;pointer-events:none"></canvas>
+    </div>
   </div>
 </div>
 </div>
@@ -3732,6 +3736,104 @@ function drawWindowElev(x,y,w,h,PX){
   ctx.restore();
 }
 // ---- 壁磚圖小圖：簡易等角 3D，標出目前立面，可點選切換 ----
+// ---- 立面位置小圖（three.js）：與 3D 圖相同的空間關係，前方牆自動隱藏 ----
+const MINI={r:null,scene:null,cam:null,root:null,meshes:[],walls:[]};
+function miniInit(){
+  if(MINI.r)return true;if(typeof THREE==='undefined')return false;
+  try{MINI.r=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch(e){return false;}
+  MINI.r.setPixelRatio(2);MINI.r.setSize(200,156);
+  document.getElementById('miniGL').appendChild(MINI.r.domElement);
+  MINI.scene=new THREE.Scene();
+  MINI.scene.add(new THREE.AmbientLight(0xffffff,0.75));const dl=new THREE.DirectionalLight(0xffffff,0.45);dl.position.set(0.6,1,0.3);MINI.scene.add(dl);
+  MINI.cam=new THREE.OrthographicCamera(-1,1,1,-1,-5000,5000);
+  const el=MINI.r.domElement,ray=new THREE.Raycaster();
+  const hit=e=>{const rc=el.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2(((e.clientX-rc.left)/rc.width)*2-1,-((e.clientY-rc.top)/rc.height)*2+1),MINI.cam);
+    const h=ray.intersectObjects(MINI.meshes.filter(m=>m.visible),false).find(h=>h.object.userData.idx>=0);return h?h.object.userData:null;};
+  el.addEventListener('click',e=>{const u=hit(e);if(!u)return;state.wallFace=u.idx;if(u.key)state.orgSel='seg:'+u.key;updateWallFaceLbl();scheduleRender();});
+  el.addEventListener('mousemove',e=>{el.style.cursor=hit(e)?'pointer':'default';});
+  return true;
+}
+function renderMini3D(){
+  if(!miniInit())return false;
+  document.getElementById('miniCv').style.display='none';document.getElementById('miniGL').style.display='block';
+  const p=P(),d=innerDim(),sm=spaceModel(p,d),H=p.wallH*0.6,iw=d.iw,ih=d.ih;
+  const faces=allWallFaces(),cur=faces[state.wallFace%faces.length];
+  const curKeys=cur&&cur.kind==='wall'?new Set(cur.group.fronts.concat(cur.group.rets).map(t=>t.key)):new Set();
+  const selKey=(state.orgSel||'').startsWith('seg:')?state.orgSel.slice(4):'';
+  const idxOfSeg=key=>faces.findIndex(f=>f.kind==='wall'&&f.group.fronts.concat(f.group.rets).some(t=>t.key===key));
+  // 自動轉向：讓目前的立面朝向鏡頭
+  const ck=cur?(cur.kind==='wall'?'w:'+cur.group.tag:'t:'+cur.s.id+cur.edge):'';
+  const dirOf=r=>{const a=Math.PI/4+r*Math.PI/2;return[Math.cos(a),Math.sin(a)];};
+  if(ck!==state._miniCur){state._miniCur=ck;
+    let n=null;if(cur&&cur.kind==='wall'){const g0=cur.group.fronts[0];if(g0)n=g0.axis==='h'?[0,g0.side]:[g0.side,0];}
+    else if(cur){n={n:[0,-1],s:[0,1],w:[-1,0],e:[1,0],deck:null}[cur.edge]||null;}
+    // 選一個讓這一面朝向鏡頭的視角（牆用室內法線、半牆用朝外法線）
+    if(n){let best=state.miniRot||0,bv=-9;for(let r=0;r<4;r++){const v=dirOf(r),dot=n[0]*v[0]+n[1]*v[1];if(dot>bv+1e-6){bv=dot;best=r;}}state.miniRot=best;}}
+  const [vx,vz]=dirOf(state.miniRot||0);
+  // 重建場景
+  if(MINI.root){MINI.scene.remove(MINI.root);MINI.root.traverse(o=>{o.geometry&&o.geometry.dispose();o.material&&o.material.dispose&&o.material.dispose();});}
+  const root=new THREE.Group();MINI.root=root;MINI.scene.add(root);MINI.meshes=[];MINI.walls=[];
+  const mat=(c,o)=>new THREE.MeshLambertMaterial({color:c,side:THREE.DoubleSide,transparent:o!=null,opacity:o==null?1:o,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+  const edge=(geo,obj)=>{const l=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x6E7274}));obj.add(l);};
+  // 地板
+  sm.floorRects.forEach(r=>{const w=(r.x2-r.x1)/10,dd=(r.y2-r.y1)/10,g=new THREE.PlaneGeometry(w,dd),m=new THREE.Mesh(g,mat(0xEDE9E1));m.rotation.x=-Math.PI/2;m.position.set((r.x1+r.x2)/20,0,(r.y1+r.y2)/20);m.userData={idx:-1};root.add(m);});
+  // 柱、管道間：實心方塊
+  sm.cols.forEach(c=>{const w=(c.x2-c.x1)/10,dd=(c.y2-c.y1)/10,g=new THREE.BoxGeometry(w,H,dd),m=new THREE.Mesh(g,mat(0xA9AEB1));m.position.set((c.x1+c.x2)/20,H/2,(c.y1+c.y2)/20);m.userData={idx:-1};edge(g,m);root.add(m);});
+  // 各面（牆、柱面、管道間面）
+  sm.segs.forEach(sg=>{
+    const L=sg.len/10;if(L<=0)return;
+    const u=sg.axis==='h'?{x:sg.flip?-1:1,y:0}:{x:0,y:sg.flip?-1:1};
+    const P0=sg.axis==='h'?{x:sg.flip?sg.b:sg.a,y:sg.c}:{x:sg.c,y:sg.flip?sg.b:sg.a};
+    const geo=new THREE.PlaneGeometry(L,H);geo.translate(L/2,H/2,0);
+    const on=curKeys.has(sg.key),sel=on&&sg.key===selKey&&curKeys.size>1;
+    const base=sg.kind==='wall'?0xD9DCDD:0xB9BEC1;
+    const m=new THREE.Mesh(geo,mat(sel?0xF0A060:on?0xF6B987:base));
+    const xv=new THREE.Vector3(u.x,0,u.y),yv=new THREE.Vector3(0,1,0),zv=new THREE.Vector3(-u.y,0,u.x);
+    m.matrixAutoUpdate=false;m.matrix.makeBasis(xv,yv,zv).setPosition(P0.x/10,0,P0.y/10);
+    m.position.y+=sg.kind==='wall'?0:0.05;
+    m.userData={idx:idxOfSeg(sg.key),key:sg.key,tag:sg.tag||sg.key,on,wall:sg.kind==='wall',n:[zv.x,zv.z],mid:new THREE.Vector3(P0.x/10+u.x*L/2,H*0.55,P0.y/10+u.y*L/2)};
+    edge(geo,m);root.add(m);MINI.meshes.push(m);MINI.walls.push(m);
+  });
+  // 浴缸（半牆、檯面可點）
+  state.stickers.filter(t=>t.type==='bathtub'&&!t._placing).forEach(t=>{
+    const r=stkFootprint(t),Ht=stkHeight(t)*0.6,W=(r.x2-r.x1)/10,D=(r.y2-r.y1)/10,cx=(r.x1+r.x2)/20,cz=(r.y1+r.y2)/20;
+    const fi=e=>faces.findIndex(f=>f.kind!=='wall'&&f.s===t&&f.edge===e);
+    const isOn=e=>cur&&cur.kind!=='wall'&&cur.s===t&&cur.edge===e;
+    const body=new THREE.Mesh(new THREE.BoxGeometry(W-0.4,Ht-0.2,D-0.4),mat(0xD8D3CA));body.position.set(cx,Ht/2,cz);body.userData={idx:-1};root.add(body);
+    const deckG=new THREE.PlaneGeometry(W,D),deck=new THREE.Mesh(deckG,mat(isOn('deck')?0xF6B987:0xF4F2EE));deck.rotation.x=-Math.PI/2;deck.position.set(cx,Ht+0.05,cz);
+    deck.userData={idx:fi('deck')};edge(deckG,deck);root.add(deck);MINI.meshes.push(deck);
+    const h=tubHole(t),hg=new THREE.PlaneGeometry((h.x2-h.x1)/10,(h.y2-h.y1)/10),hm=new THREE.Mesh(hg,new THREE.MeshBasicMaterial({color:0xFFFFFF,side:THREE.DoubleSide}));
+    hm.rotation.x=-Math.PI/2;hm.position.set((h.x1+h.x2)/20,Ht+0.1,(h.y1+h.y2)/20);hm.userData={idx:fi('deck')};edge(hg,hm);root.add(hm);MINI.meshes.push(hm);
+    tubExposedEdges(t).forEach(e=>{
+      const len=(e==='n'||e==='s')?W:D,g=new THREE.PlaneGeometry(len,Ht),m=new THREE.Mesh(g,mat(isOn(e)?0xF6B987:0xE3DED6));
+      const o=0.15;
+      if(e==='n')m.position.set(cx,Ht/2,cz-D/2-o);else if(e==='s')m.position.set(cx,Ht/2,cz+D/2+o);
+      else{m.rotation.y=Math.PI/2;m.position.set(e==='w'?cx-W/2-o:cx+W/2+o,Ht/2,cz);}
+      m.userData={idx:fi(e)};edge(g,m);root.add(m);MINI.meshes.push(m);
+    });
+  });
+  // 鏡頭：等角視角，置中縮放
+  const tgt=new THREE.Vector3(iw/2,H/2,ih/2),R=Math.max(iw,ih,H)*2;
+  MINI.cam.position.set(tgt.x+vx*R,tgt.y+R*0.8,tgt.z+vz*R);MINI.cam.up.set(0,1,0);MINI.cam.lookAt(tgt);MINI.cam.updateMatrixWorld();
+  // 前方牆隱藏（鏡頭在牆外側時）
+  MINI.walls.forEach(m=>{if(!m.userData.wall)return;const n=m.userData.n,toCam=[vx,vz];m.visible=(n[0]*toCam[0]+n[1]*toCam[1])>=-1e-6||m.userData.on;
+    if(m.userData.on&&(n[0]*toCam[0]+n[1]*toCam[1])<0){m.material.transparent=true;m.material.opacity=0.35;}});
+  // 縮放到剛好
+  const box=new THREE.Box3();root.children.forEach(o=>{if(o.visible!==false)box.expandByObject(o);});
+  const pts=[];for(const x of[box.min.x,box.max.x])for(const y of[box.min.y,box.max.y])for(const z of[box.min.z,box.max.z])pts.push(new THREE.Vector3(x,y,z).applyMatrix4(MINI.cam.matrixWorldInverse));
+  const xs=pts.map(v=>v.x),ys=pts.map(v=>v.y),cxm=(Math.min(...xs)+Math.max(...xs))/2,cym=(Math.min(...ys)+Math.max(...ys))/2;
+  const half=Math.max((Math.max(...xs)-Math.min(...xs))/2*(156/200),(Math.max(...ys)-Math.min(...ys))/2)*1.08;
+  MINI.cam.left=cxm-half*200/156;MINI.cam.right=cxm+half*200/156;MINI.cam.top=cym+half;MINI.cam.bottom=cym-half;MINI.cam.updateProjectionMatrix();
+  MINI.r.render(MINI.scene,MINI.cam);
+  // 標籤：目前這組的編號＋各主牆字母（只標看得到的）
+  const lc=document.getElementById('miniLbl');lc.width=400;lc.height=312;const c=lc.getContext('2d');c.setTransform(2,0,0,2,0,0);c.clearRect(0,0,200,156);
+  c.font='bold 10px DM Mono,monospace';c.textAlign='center';c.textBaseline='middle';
+  MINI.walls.forEach(m=>{const u=m.userData;if(!m.visible||(!u.on&&!u.wall))return;
+    const facing=(u.n[0]*vx+u.n[1]*vz)>=0;if(!u.on&&!facing)return;
+    const v=u.mid.clone().project(MINI.cam),x=(v.x+1)/2*200,y=(1-v.y)/2*156;
+    const t=u.tag;c.lineWidth=3;c.strokeStyle='rgba(255,255,255,.85)';c.strokeText(t,x,y);c.fillStyle=u.on?'#9A3D00':'#4D5153';c.fillText(t,x,y);});
+  return true;
+}
 function renderMiniMap(){
   const wrap=document.getElementById('miniWrap');if(!wrap)return;
   const show=state.view==='wall'&&state.spaceDone;wrap.style.display=show?'block':'none';
@@ -3740,7 +3842,9 @@ function renderMiniMap(){
   const cw=document.getElementById('canvasWrap');wrap.style.top=(cw.offsetTop+10)+'px';
   const cv=document.getElementById('miniCv');cv.style.display=fold?'none':'block';
   document.getElementById('miniRotBtn').style.display=fold?'none':'';document.getElementById('miniFoldBtn').textContent=fold?'▸':'–';
+  document.getElementById('miniBox').style.display=fold?'none':'block';
   if(fold)return;
+  if(renderMini3D())return;
   const W=200,Hh=156,dpr=2;cv.width=W*dpr;cv.height=Hh*dpr;
   const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,Hh);
   const p=P(),d=innerDim(),sm=spaceModel(p,d),iw=d.iw*10,ih=d.ih*10,WH=p.wallH*10*0.55;
@@ -3925,7 +4029,7 @@ function renderWallView(){
   }
   // 各段起鋪點標記
   state._wHits.forEach(h=>{const id='seg:'+h.seg.key;drawFirstTile(h.X,h.Y,h.PX,orgRaw(id),p.wallTileW,p.wallTileH,h.w,h.h,state.orgSel===id||state._wHits.length===1);
-    if(state.orgSel==='seg:'+h.seg.key&&state._wHits.length>1){ctx.save();ctx.strokeStyle='#F07020';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.strokeRect(h.X-3,h.Y-3,h.w*h.PX+6,h.h*h.PX+6);ctx.restore();}});
+    if(state.mode==='origin'&&state.orgSel==='seg:'+h.seg.key&&state._wHits.length>1){ctx.save();ctx.strokeStyle='#F07020';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.strokeRect(h.X-3,h.Y-3,h.w*h.PX+6,h.h*h.PX+6);ctx.restore();}});
   drawSnapHover();drawWallProcHover();updateOrgBar();updateFtBar();renderMiniMap();
 }
 // 起鋪點標記（只畫在該面範圍內）
