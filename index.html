@@ -283,7 +283,7 @@ canvas{display:block}
       <span class="sb-chevron" id="chevronsbOrigin">▼</span>
     </div>
     <div class="sb-body hidden" id="sbOrigin">
-    <div class="info-tip" style="margin-bottom:7px">切換「設定起鋪點」模式後在圖面點選，靠近轉角會吸附到陽角／陰角（含柱、管道間、浴缸裙牆），靠近牆線會吸附到線上。X/Y 可輸入小數達到 mm 精度。</div>
+    <div class="info-tip" style="margin-bottom:7px">切換「設定起鋪點」模式後在圖面點選，靠近轉角會吸附到陽角／陰角（含柱、管道間、浴缸半牆），靠近牆線會吸附到線上。X/Y 可輸入小數達到 mm 精度。</div>
     <div class="row">
       <div class="field"><label>X (cm)</label><input type="number" id="originX" value="0" step="0.1" oninput="scheduleRender()"></div>
       <div class="field"><label>Y (cm)</label><input type="number" id="originY" value="0" step="0.1" oninput="scheduleRender()"></div>
@@ -403,7 +403,7 @@ canvas{display:block}
           </div>
         </div>
         <div id="stTubBox" style="display:none;margin-top:4px">
-          <div style="font-size:10px;color:var(--muted);margin-bottom:3px">裙牆（沒靠牆的邊自動砌矮牆貼磚）</div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px">半牆（沒靠牆的邊自動砌矮牆貼磚）</div>
           <div id="stTubEdges" style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;margin-bottom:6px"></div>
           <div class="row">
             <div class="field"><label>砌牆高度 (cm)</label><input type="number" id="stTubH" min="1" step="0.5" oninput="applyStickerEdit()"></div>
@@ -421,9 +421,9 @@ canvas{display:block}
             <div class="field"><label>距 B 側 (cm)</label><input type="number" id="stOffB" min="0" step="0.5" oninput="applyStickerEdit()"></div>
           </div>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;margin-top:4px;cursor:pointer"><input type="checkbox" id="stTubDeck" onchange="applyStickerEdit()">檯面貼磚</label>
-          <div style="font-size:10px;color:var(--muted);margin:8px 0 3px">裙牆／檯面起鋪點（與地、壁磚分開；X 由左、Y 由上緣算起）</div>
+          <div style="font-size:10px;color:var(--muted);margin:8px 0 3px">半牆／檯面起鋪點（與地、壁磚分開；X 由左、Y 由上緣算起）</div>
           <div id="stTubOrgs"></div>
-          <div class="info-tip" style="margin-top:3px">⟳ 可讓該面的磚轉 90°（橫貼／直貼），每面分開設定。也可在壁磚圖切到裙牆或檯面，按「設定起鋪點」直接點選，會吸附端點與缸緣。</div>
+          <div class="info-tip" style="margin-top:3px">⟳ 可讓該面的磚轉 90°（橫貼／直貼），每面分開設定。也可在壁磚圖切到半牆或檯面，按「設定起鋪點」直接點選，會吸附端點與缸緣。</div>
         </div>
         <div id="stElevRow" class="row" style="display:none">
           <div class="field"><label>高度 (cm)</label><input type="number" id="stElevH" min="1" oninput="applyStickerEdit()"></div>
@@ -1535,7 +1535,7 @@ function snapPoint(x,y,xs,ys,pts,thr){
   return{x:sx?sx.v:Math.round(x),y:sy?sy.v:Math.round(y),lbl,snap:(sx?1:0)+(sy?1:0)};
 }
 const KIND_LBL={wall:'牆',column:'柱',pipe:'管道間'};
-// 地磚圖：可吸附的線（牆、柱、管道間、浴缸裙牆）與轉角
+// 地磚圖：可吸附的線（牆、柱、管道間、浴缸半牆）與轉角
 function floorSnapData(){
   const sm=spaceModel(),xs=[],ys=[],pts=[];
   const cn=c=>c==='out'?'陽角':c==='in'?'陰角':'端點';
@@ -1549,8 +1549,8 @@ function floorSnapData(){
   });
   state.stickers.filter(t=>t.type==='bathtub'&&!t._placing).forEach(t=>{
     const r=stkFootprint(t),ex=tubExposedEdges(t);
-    if(ex.includes('w'))xs.push({v:r.x1,lbl:'裙牆'});if(ex.includes('e'))xs.push({v:r.x2,lbl:'裙牆'});
-    if(ex.includes('n'))ys.push({v:r.y1,lbl:'裙牆'});if(ex.includes('s'))ys.push({v:r.y2,lbl:'裙牆'});
+    if(ex.includes('w'))xs.push({v:r.x1,lbl:'半牆'});if(ex.includes('e'))xs.push({v:r.x2,lbl:'半牆'});
+    if(ex.includes('n'))ys.push({v:r.y1,lbl:'半牆'});if(ex.includes('s'))ys.push({v:r.y2,lbl:'半牆'});
     [[r.x1,r.y1],[r.x2,r.y1],[r.x2,r.y2],[r.x1,r.y2]].forEach(([x,y])=>{
       const onWall=sm.segs.some(g=>g.axis==='h'?Math.abs(g.c-y)<5&&x>=g.a-5&&x<=g.b+5:Math.abs(g.c-x)<5&&y>=g.a-5&&y<=g.b+5);
       pts.push({x,y,lbl:onWall?'浴缸陰角':'浴缸陽角'});
@@ -1566,7 +1566,7 @@ function floorSnapAt(cx,cy){
   r.x=Math.max(0,Math.min(d.iw*10,r.x));r.y=Math.max(0,Math.min(d.ih*10,r.y));
   r.px=MARGIN+(wtmm+r.x)*PX;r.py=MARGIN+(wtmm+r.y)*PX;return r;
 }
-// 壁磚圖／裙牆：可吸附的線與轉角（面內座標 mm）
+// 壁磚圖／半牆：可吸附的線與轉角（面內座標 mm）
 function faceSnapData(h){
   const xs=[],ys=[],pts=[];
   if(h.kind==='seg'){
@@ -1581,7 +1581,7 @@ function faceSnapData(h){
     });
   }else{
     const f=h.face;
-    if(f.kind==='apron'){xs.push({v:0,lbl:'裙牆端'},{v:h.w,lbl:'裙牆端'});ys.push({v:0,lbl:'缸緣'},{v:h.h,lbl:'地面'});}
+    if(f.kind==='apron'){xs.push({v:0,lbl:'半牆端'},{v:h.w,lbl:'半牆端'});ys.push({v:0,lbl:'缸緣'},{v:h.h,lbl:'地面'});}
     else{xs.push({v:0,lbl:'檯面邊'},{v:h.w,lbl:'檯面邊'});ys.push({v:0,lbl:'檯面邊'},{v:h.h,lbl:'檯面邊'});
       f.excl.forEach(e=>{xs.push({v:e.x1,lbl:'缸口'},{v:e.x2,lbl:'缸口'});ys.push({v:e.y1,lbl:'缸口'},{v:e.y2,lbl:'缸口'});});}
   }
@@ -1609,7 +1609,7 @@ function drawSnapHover(){
   ctx.setLineDash([]);ctx.lineWidth=2;ctx.beginPath();
   if(r.snap===2){ctx.rect(r.px-6,r.py-6,12,12);}else{ctx.arc(r.px,r.py,6,0,Math.PI*2);}
   ctx.stroke();
-  const tag=r.hit?(r.hit.kind==='seg'?r.hit.seg.tag:(r.hit.face.kind==='deck'?'檯面':'裙牆')):'';
+  const tag=r.hit?(r.hit.kind==='seg'?r.hit.seg.tag:(r.hit.face.kind==='deck'?'檯面':'半牆')):'';
   const t=(tag?tag+'｜':'')+(r.lbl?r.lbl+'  ':'')+`${Math.round(r.x)/10}, ${Math.round(r.y)/10}`;
   ctx.font='11px DM Mono,Noto Sans TC,monospace';const w=ctx.measureText(t).width+10;
   let bx=r.px+10,by=r.py-24;if(bx+w>canvas.width-2)bx=Math.max(2,r.px-10-w);if(by<2)by=r.py+8;
@@ -2056,7 +2056,7 @@ function applyStickerEdit(){
   renderStickerList();scheduleRender();
 }
 
-// 嵌入式浴缸：裙牆四邊勾選（靠牆的邊不可選）
+// 嵌入式浴缸：半牆四邊勾選（靠牆的邊不可選）
 function fillTubBox(s){
   const r=stkFootprint(s);
   document.getElementById('stTubEdges').innerHTML=TUB_EDGES.map(e=>{
@@ -2078,11 +2078,11 @@ function renderTubOrgs(s){
   const o=s.faceOrgs||{};
   el.innerHTML=ids.length?ids.map(k=>{const v=o[k]||{x:0,y:0};
     return `<div class="row" style="align-items:flex-end;margin-bottom:3px">
-      <div style="width:52px;font-size:11px;color:var(--accent);padding-bottom:7px">${k==='deck'?'檯面':'裙牆 '+TUB_EDGE_LBL[k]}</div>
+      <div style="width:52px;font-size:11px;color:var(--accent);padding-bottom:7px">${k==='deck'?'檯面':'半牆 '+TUB_EDGE_LBL[k]}</div>
       <div class="field"><label>X (cm)</label><input type="number" step="0.1" value="${v.x}" oninput="setTubOrg('${k}','x',this.value)"></div>
       <div class="field"><label>Y (cm)</label><input type="number" step="0.1" value="${v.y}" oninput="setTubOrg('${k}','y',this.value)"></div>
       <button class="btn btn-sm" style="margin-bottom:2px;white-space:nowrap" title="磚轉 90°" onclick="toggleTubRot('${s.id}','${k}')">⟳ ${tubRotLbl(s,k)}</button>
-    </div>`;}).join(''):'<div class="info-tip">沒有需要貼磚的裙牆或檯面。</div>';
+    </div>`;}).join(''):'<div class="info-tip">沒有需要貼磚的半牆或檯面。</div>';
 }
 function tubRotLbl(s,k){const sp=tubFaceSpec(s,k,tubTileSpec(s));return `${sp.tileW/10}×${sp.tileH/10}`;}
 function setTubOrg(k,f,v){
@@ -2730,6 +2730,7 @@ function renderFloorView(){
     }
     ctx.restore();
   });
+  drawDeckOnFloor(tx,ty,wtmm,PX);
 
   // Proc marks
   state.procs.forEach(proc=>{
@@ -2872,8 +2873,8 @@ function pairCuts(cuts,startId){
   return new Set(cuts.map(c=>c.pairId)).size;
 }
 
-// ---- 嵌入式浴缸：裙牆 / 檯面貼磚 ----
-// 以浴缸外框（含裙牆）四邊判斷：n=朝 A、e=朝 B、s=朝 C、w=朝 D
+// ---- 嵌入式浴缸：半牆 / 檯面貼磚 ----
+// 以浴缸外框（含半牆）四邊判斷：n=朝 A、e=朝 B、s=朝 C、w=朝 D
 const TUB_EDGES=['n','e','s','w'];
 const TUB_EDGE_LBL={n:'A側',e:'B側',s:'C側',w:'D側'};
 function tubRim(s){return s.rim!=null?s.rim:10;}
@@ -2922,7 +2923,7 @@ function toggleTubRot(id,k){
   s.faceRot=s.faceRot||{};s.faceRot[k]=!s.faceRot[k];
   if(s.selected)renderTubOrgs(s);scheduleRender();setTimeout(()=>updateOrgBar(true),30);
 }
-// 所有浴缸的貼磚面（裙牆立面＋檯面），尺寸 mm
+// 所有浴缸的貼磚面（半牆立面＋檯面），尺寸 mm
 function tubFaces(){
   const out=[];
   state.stickers.filter(s=>s.type==='bathtub'&&!s._placing).forEach(s=>{
@@ -2930,7 +2931,7 @@ function tubFaces(){
     tubExposedEdges(s).forEach(e=>{
       const w=(e==='n'||e==='s')?r.x2-r.x1:r.y2-r.y1;
       const og=(s.faceOrgs||{})[e]||{};
-      out.push({kind:'apron',s,edge:e,label:`${s.label}・裙牆 ${TUB_EDGE_LBL[e]}`,w,h:Hmm,excl:[],spec:tubFaceSpec(s,e,spec),baseSpec:spec,ox:(og.x||0)*10,oy:(og.y||0)*10});
+      out.push({kind:'apron',s,edge:e,label:`${s.label}・半牆 ${TUB_EDGE_LBL[e]}`,w,h:Hmm,excl:[],spec:tubFaceSpec(s,e,spec),baseSpec:spec,ox:(og.x||0)*10,oy:(og.y||0)*10});
     });
     if(tubDeckOn(s)){
       // 檯面（平面方向，上 = A 側）：挖掉缸口
@@ -2972,7 +2973,7 @@ function tubWallExclusions(wallKey,surfW,wallHmm){
   });
   return out;
 }
-// 平面圖：裙牆以粗線標示
+// 平面圖：半牆以粗線標示
 function drawTubAprons(tx,ty,wtmm,PX){
   state.stickers.filter(s=>s.type==='bathtub'&&!s._placing).forEach(s=>{
     const r=stkFootprint(s),t=tubApronT(s)*10;
@@ -2985,6 +2986,20 @@ function drawTubAprons(tx,ty,wtmm,PX){
     ctx.restore();
   });
 }
+// 地磚圖：浴缸檯面的磚面配置（避開缸口），疊在浴缸符號上
+function drawDeckOnFloor(tx,ty,wtmm,PX){
+  if(!stkShownTub())return;
+  tubFaces().filter(f=>f.kind==='deck').forEach(f=>{
+    const r=stkFootprint(f.s),X=tx(wtmm+r.x1),Y=ty(wtmm+r.y1),h=f.excl[0];
+    ctx.save();
+    ctx.beginPath();ctx.rect(X,Y,f.w*PX,f.h*PX);ctx.rect(X+h.x1*PX,Y+h.y1*PX,(h.x2-h.x1)*PX,(h.y2-h.y1)*PX);ctx.clip('evenodd');
+    drawTileSurface(X,Y,f.w,f.h,f.ox||0,f.oy||0,false,false,f.excl,{tileW:f.spec.tileW,tileH:f.spec.tileH,grout:f.spec.grout,layout:f.spec.layout});
+    ctx.restore();
+    ctx.save();ctx.strokeStyle='#2B2F31';ctx.lineWidth=1.4;ctx.setLineDash([]);ctx.strokeRect(X,Y,f.w*PX,f.h*PX);
+    ctx.strokeStyle='#5B8FB9';ctx.lineWidth=1.2;ctx.strokeRect(X+h.x1*PX,Y+h.y1*PX,(h.x2-h.x1)*PX,(h.y2-h.y1)*PX);ctx.restore();
+  });
+}
+function stkShownTub(){return true;}
 // 畫一個貼磚面（壁磚圖用 / 3D 貼圖用）
 function drawTubFaceSurface(f,X,Y,PX){
   drawTileSurface(X,Y,f.w,f.h,f.ox||0,f.oy||0,false,false,f.excl,{tileW:f.spec.tileW,tileH:f.spec.tileH,grout:f.spec.grout,layout:f.spec.layout});
@@ -2993,15 +3008,15 @@ function drawTubFaceSurface(f,X,Y,PX){
     ctx.strokeStyle='#8BB4D4';ctx.lineWidth=1.2;ctx.strokeRect(X+e.x1*PX,Y+e.y1*PX,(e.x2-e.x1)*PX,(e.y2-e.y1)*PX);
   });
 }
-// 壁磚圖：浴缸裙牆 / 檯面
+// 壁磚圖：浴缸半牆 / 檯面
 function renderTubFaceView(f){
   const PX=PXpm();
-  const PAD=24,LBLH=26,FOOTER=30;
+  const PAD=24,LBLH=26,FOOTER=84,DIMW=96;
   const wPX=f.w*PX,hPX=f.h*PX;
-  canvas.width=Math.ceil(wPX+PAD*2+40);canvas.height=Math.ceil(hPX+LBLH+FOOTER+PAD*2);
+  canvas.width=Math.ceil(Math.max(wPX+PAD*2+DIMW+40,360));canvas.height=Math.ceil(hPX+LBLH+FOOTER+PAD*2);
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#EEF4F5';ctx.fillRect(0,0,canvas.width,canvas.height);
-  const X=PAD+20,Y=PAD+LBLH;
+  const X=PAD+DIMW,Y=PAD+LBLH;
   drawTubFaceSurface(f,X,Y,PX);
   state._wHits=[{kind:'tub',face:f,X,Y,w:f.w,h:f.h,PX}];
   if(f.kind==='apron'){
@@ -3015,7 +3030,11 @@ function renderTubFaceView(f){
   ctx.fillStyle='#1A1916';ctx.font='bold 13px DM Mono,Noto Sans TC,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillText(f.label,X+wPX/2,PAD+LBLH/2);
   ctx.fillStyle='#7A776E';ctx.font='10px DM Mono,monospace';ctx.textBaseline='top';
-  ctx.fillText(`${Math.round(f.w)/10} × ${Math.round(f.h)/10} cm　${f.spec.name} ${f.spec.tileW/10}×${f.spec.tileH/10} cm`,X+wPX/2,Y+hPX+8);
+  // 尺寸標註：下方寬度、左側高度（檯面另標缸口位置）
+  {const xs=[0,f.w],ys=[0,f.h];f.excl.forEach(e=>{xs.push(e.x1,e.x2);ys.push(e.y1,e.y2);});
+    drawDimGroup('h',1,Y+hPX,xs,v=>X+v*PX,18);drawDimGroup('v',-1,X,ys,v=>Y+v*PX,14);}
+  ctx.fillStyle='#7A776E';ctx.font='10px DM Mono,Noto Sans TC,monospace';ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.fillText(`${f.spec.name} ${f.spec.tileW/10}×${f.spec.tileH/10} cm`+(f.kind==='deck'?'　（上＝A 側）':''),X+wPX/2,Y+hPX+66);
   drawOrgMark(X+(f.ox||0)*PX,Y+(f.oy||0)*PX,X,Y,wPX,hPX);
   drawSnapHover();updateOrgBar();renderMiniMap();
 }
@@ -3202,7 +3221,7 @@ function renderMiniMap(){
       pts:[P2(a[0],a[1],0),P2(b[0],b[1],0),P2(b[0],b[1],WH),P2(a[0],a[1],WH)],
       idx:faceIdxOfSeg(g.key),on:curKeys.has(g.key),sel:g.key===selKey,tag:g.tag||g.key});
   });
-  // 浴缸（裙牆、檯面）
+  // 浴缸（半牆、檯面）
   state.stickers.filter(t=>t.type==='bathtub'&&!t._placing).forEach(t=>{
     const r=stkFootprint(t),TH=stkHeight(t)*10*0.55;
     const fi=e=>faces.findIndex(f=>f.kind!=='wall'&&f.s===t&&f.edge===e);
@@ -3929,7 +3948,7 @@ function makeBuiltinTub3D(s,Ht){
   const apron=new THREE.MeshLambertMaterial({color:0xD8D3CA});
   const hide=new THREE.MeshBasicMaterial({visible:false});
   const deckT=3,rim=Math.min(tubRim(s),Math.min(W,D)/2-5);
-  // 裙牆：沒靠牆的面貼上排磚
+  // 半牆：沒靠牆的面貼上排磚
   const faces=tubFaces().filter(f=>f.s===s);
   const cs=1,sn=0; // 浴缸以平面方向建模，不旋轉
   const edgeOf=(lx,lz)=>{const x=Math.round(lx*cs-lz*sn),y=Math.round(lx*sn+lz*cs);return x===1?'e':x===-1?'w':y===1?'s':'n';};
@@ -4510,10 +4529,10 @@ function showSummaryModal(){
   document.getElementById('mWallStatOrder').textContent=wr.order;
   document.getElementById('mWallSpec').textContent=`壁磚 ${p.wallTileW/10}×${p.wallTileH/10} cm　縫 ${p.wallGrout} mm　${lnames[p.wallLayout]}　壁高 ${p.wallH} cm`;
   document.getElementById('mWallNote').textContent=p.wallWaste>0?`建議叫貨已含 ${p.wallWaste}% 損耗`:'（損耗 0%，請依現場條件自行調整）';
-  // 嵌入式浴缸（裙牆＋檯面）
+  // 嵌入式浴缸（半牆＋檯面）
   const tr=calculateTubTiles();
   document.getElementById('mTubBlock').innerHTML=tr.map(t=>`
-    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:14px 0 7px">嵌入式浴缸 裙牆＋檯面（${t.spec.name}，${t.faces} 面）</div>
+    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:14px 0 7px">嵌入式浴缸 半牆＋檯面（${t.spec.name}，${t.faces} 面）</div>
     <div class="modal-stats">
       <div class="modal-stat"><div class="modal-stat-l">整磚</div><div class="modal-stat-v">${t.full}</div><div class="modal-stat-u">片</div></div>
       <div class="modal-stat"><div class="modal-stat-l">裁切片數</div><div class="modal-stat-v" style="color:var(--warn)">${t.cut}${t.sources<t.cut?' ('+t.sources+'片磚)':''}</div><div class="modal-stat-u">片</div></div>
