@@ -1734,14 +1734,7 @@ function drawFirstTile(X0,Y0,PX,o,tw,th,W,H,strong){
   if(state.mode!=='origin'){
     // 檢視模式：只畫起鋪點圓點＋簡短資訊
     const x=cx(pt.x),y=cy(pt.y);if(x<X0-2||x>X0+W*PX+2||y<Y0-2||y>Y0+H*PX+2)return;
-    const QL={ne:'右上',nw:'左上',se:'右下',sw:'左下'},q=o.q||'se';
-    const t=(o.lbl?o.lbl+'・':'')+'整磚'+QL[q]+((o.dx||o.dy)?'・偏移':'');
-    ctx.save();ctx.font='10px Noto Sans TC,DM Mono,sans-serif';const tw2=ctx.measureText(t).width+8;
-    let bx=q[1]==='w'?x-8-tw2:x+8,by=q[0]==='n'?y-20:y+6;
-    bx=Math.max(X0+1,Math.min(bx,X0+W*PX-tw2-1));by=Math.max(Y0+1,Math.min(by,Y0+H*PX-15));
-    ctx.fillStyle='rgba(255,255,255,.88)';ctx.fillRect(bx,by,tw2,14);ctx.strokeStyle='#F07020';ctx.lineWidth=0.8;ctx.strokeRect(bx,by,tw2,14);
-    ctx.fillStyle='#9A3D00';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,bx+4,by+7.5);
-    ctx.beginPath();ctx.arc(x,y,4.5,0,Math.PI*2);ctx.fillStyle='#F07020';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();
+    ctx.save();ctx.beginPath();ctx.arc(x,y,4.5,0,Math.PI*2);ctx.fillStyle='#F07020';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();
     ctx.restore();return;
   }
   ctx.save();
@@ -3052,7 +3045,9 @@ function tubWallExclusions(wallKey,surfW,wallHmm){
   const out=[];
   state.stickers.filter(s=>s.type==='bathtub'&&!s._placing).forEach(s=>{
     const r=stkFootprint(s),dd=distToSeg(r,seg);
-    if(dd==null||dd<-1||dd>30)return;
+    // 浴缸要在這一面的前方：近端離牆 3cm 內，且遠端確實伸進室內（浴缸包住柱子、管道間時近端會是負的）
+    const far=seg.axis==='h'?(seg.side>0?r.y2-seg.c:seg.c-r.y1):(seg.side>0?r.x2-seg.c:seg.c-r.x1);
+    if(dd==null||dd>30||far<=10)return;
     const a=seg.axis==='h'?Math.max(r.x1,seg.a):Math.max(r.y1,seg.a);
     const b=seg.axis==='h'?Math.min(r.x2,seg.b):Math.min(r.y2,seg.b);
     if(b<=a)return;
