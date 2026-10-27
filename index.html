@@ -75,6 +75,10 @@ input:focus,select:focus{border-color:var(--accent)}
 .canvas-area{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
 .ctbar{background:var(--surface);border-bottom:1px solid var(--border);padding:7px 14px;display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap}
 .canvas-wrap{flex:1;overflow:auto;padding:20px;position:relative}
+.obq{width:20px;height:20px;padding:0;border:1px solid #C9D3D5;border-radius:2px;background:#F3F5F5;cursor:pointer}
+.obq:hover{border-color:#F07020}
+.obq.on{background:#F6B987;border-color:#E0661A}
+.obn{padding:2px 7px!important;font-size:13px;line-height:1.1}
 canvas{display:block}
 .li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
 .ls{width:13px;height:13px;border-radius:2px;border:1px solid rgba(0,0,0,.1)}
@@ -283,8 +287,8 @@ canvas{display:block}
       <span class="sb-chevron" id="chevronsbOrigin">▼</span>
     </div>
     <div class="sb-body hidden" id="sbOrigin">
-    <div class="info-tip" style="margin-bottom:7px">切換「設定起鋪點」模式後在圖面點選，靠近轉角會吸附到陽角／陰角（含柱、管道間、浴缸半牆），靠近牆線會吸附到線上。X/Y 可輸入小數達到 mm 精度。</div>
-    <div class="row">
+    <div class="info-tip" style="margin-bottom:7px">在地磚圖按「設定起鋪點」→ 點選基準點（會吸附陽角／陰角／半牆）→ 用上方田字選整磚方向 → 用箭頭微調。下方可快速選房間的角或中點當基準。</div>
+    <div class="row" style="display:none">
       <div class="field"><label>X (cm)</label><input type="number" id="originX" value="0" step="0.1" oninput="scheduleRender()"></div>
       <div class="field"><label>Y (cm)</label><input type="number" id="originY" value="0" step="0.1" oninput="scheduleRender()"></div>
     </div>
@@ -421,7 +425,7 @@ canvas{display:block}
             <div class="field"><label>距 B 側 (cm)</label><input type="number" id="stOffB" min="0" step="0.5" oninput="applyStickerEdit()"></div>
           </div>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;margin-top:4px;cursor:pointer"><input type="checkbox" id="stTubDeck" onchange="applyStickerEdit()">檯面貼磚</label>
-          <div style="font-size:10px;color:var(--muted);margin:8px 0 3px">半牆／檯面起鋪點（與地、壁磚分開；X 由左、Y 由上緣算起）</div>
+          <div style="font-size:10px;color:var(--muted);margin:8px 0 3px">半牆／檯面起鋪點與磚向（與地、壁磚分開設定）</div>
           <div id="stTubOrgs"></div>
           <div class="info-tip" style="margin-top:3px">⟳ 可讓該面的磚轉 90°（橫貼／直貼），每面分開設定。也可在壁磚圖切到半牆或檯面，按「設定起鋪點」直接點選，會吸附端點與缸緣。</div>
         </div>
@@ -723,18 +727,23 @@ canvas{display:block}
     </div>
   </div>
   <!-- 起鋪點數值列（地磚圖／壁磚圖） -->
-  <div id="orgBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 14px;border-bottom:1px solid var(--border);background:#F7FAFA;font-size:12px;color:var(--muted)">
+  <div id="orgBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 14px;border-bottom:1px solid var(--border);background:#F7FAFA;font-size:12px;color:var(--muted)">
     <span style="font-weight:600;color:var(--accent)">起鋪點</span>
-    <select id="obFace" onchange="state.orgSel=this.value;updateOrgBar(true);scheduleRender()" style="width:auto;flex:none;min-width:120px;padding:3px 6px"></select>
-    <label style="display:flex;align-items:center;gap:3px">X<input id="obX" type="number" step="0.1" style="width:72px;flex:none;padding:3px 6px" oninput="orgBarInput()">cm</label>
-    <label style="display:flex;align-items:center;gap:3px">Y<input id="obY" type="number" step="0.1" style="width:72px;flex:none;padding:3px 6px" oninput="orgBarInput()">cm</label>
-    <span style="width:1px;height:16px;background:var(--border)"></span>
-    <span>偏移</span>
-    <label style="display:flex;align-items:center;gap:3px">X<input id="obDX" type="number" step="0.1" value="0" style="width:60px;flex:none;padding:3px 6px">cm</label>
-    <label style="display:flex;align-items:center;gap:3px">Y<input id="obDY" type="number" step="0.1" value="0" style="width:60px;flex:none;padding:3px 6px">cm</label>
-    <button class="btn btn-sm" onclick="orgBarOffset()">套用偏移</button>
+    <select id="obFace" onchange="state.orgSel=this.value;updateOrgBar(true);scheduleRender()" style="width:auto;flex:none;min-width:110px;padding:3px 6px"></select>
+    <span id="obBase" style="color:var(--text)"></span>
+    <span style="width:1px;height:18px;background:var(--border)"></span>
+    <span style="display:flex;align-items:center;gap:5px">整磚方向
+      <span id="obQuad" style="display:inline-grid;grid-template-columns:20px 20px;grid-template-rows:20px 20px;gap:2px;padding:2px;border:1px solid var(--border);border-radius:4px;background:#fff">
+        <button class="obq" data-q="nw" title="整磚在左上" onclick="obSetQ('nw')"></button><button class="obq" data-q="ne" title="整磚在右上" onclick="obSetQ('ne')"></button>
+        <button class="obq" data-q="sw" title="整磚在左下" onclick="obSetQ('sw')"></button><button class="obq" data-q="se" title="整磚在右下" onclick="obSetQ('se')"></button>
+      </span></span>
+    <span style="width:1px;height:18px;background:var(--border)"></span>
+    <span style="display:flex;align-items:center;gap:3px">微調
+      <button class="btn btn-sm obn" title="往左" onclick="obNudge(-1,0)">←</button><button class="btn btn-sm obn" title="往上" onclick="obNudge(0,1)">↑</button><button class="btn btn-sm obn" title="往下" onclick="obNudge(0,-1)">↓</button><button class="btn btn-sm obn" title="往右" onclick="obNudge(1,0)">→</button>
+      每次<input id="obStep" type="number" step="0.5" min="0.1" value="5" style="width:52px;flex:none;padding:3px 6px">cm
+      <button class="btn btn-sm" title="偏移歸零，回到基準點" onclick="obResetOff()">歸零</button></span>
     <button class="btn btn-sm" id="obRot" style="display:none" onclick="obRotate()"></button>
-    <span id="obHint" style="font-size:11px"></span>
+    <span id="obInfo" style="font-size:11px;flex-basis:100%"></span>
   </div>
   <div class="canvas-wrap" id="canvasWrap">
     <canvas id="fc"></canvas>
@@ -1044,10 +1053,11 @@ function defaultWallKey(){const s=wallSegs();return s.length?s[0].key:'A';}
 
 // ---- 舊版（矩形 / L 型 固定命名）牆面，用於載入舊檔時換算 ----
 // ---- 壁磚起鋪點：依牆面動態產生 ----
-const ORG_MODES=[['auto','自動（陽角起磚）'],['left','左端起磚'],['right','右端起磚'],['center','置中'],['custom','自訂 X']];
+const ORG_MODES=[['anchor','點選基準（在壁磚圖設定）'],['auto','自動（陽角起磚）'],['left','左端起磚'],['right','右端起磚'],['center','置中'],['custom','自訂 X']];
 function segOrigin(seg,p){
   p=p||P();
   const o=(state.wallOrgs||{})[seg.key]||{},mode=o.mode||'auto',len=seg.len,tw=p.wallTileW;
+  if(mode==='anchor')return anchorOrigin(o,p.wallTileW,p.wallTileH);
   let x=0;
   if(mode==='custom')x=(o.x||0)*10;
   else if(mode==='right')x=len-tw;
@@ -1068,8 +1078,8 @@ function renderWallOrgPanel(force){
       <div class="row">
         <div class="field"><label>橫向</label><select onchange="setWallOrg('${s.key}','mode',this.value)">${ORG_MODES.map(([v,l])=>`<option value="${v}" ${v===m?'selected':''}>${l}</option>`).join('')}</select></div>
         <div class="field" style="max-width:62px;${m==='custom'?'':'display:none'}"><label>X (cm)</label><input type="number" step="0.1" value="${o.x||0}" oninput="setWallOrg('${s.key}','x',+this.value||0)"></div>
-        <div class="field" style="max-width:62px"><label>Y (cm)</label><input type="number" step="0.1" value="${o.y||0}" oninput="setWallOrg('${s.key}','y',+this.value||0)"></div>
-      </div></div>`;
+        <div class="field" style="max-width:62px;${m==='anchor'?'display:none':''}"><label>Y (cm)</label><input type="number" step="0.1" value="${o.y||0}" oninput="setWallOrg('${s.key}','y',+this.value||0)"></div>
+      </div>${m==='anchor'?`<div class="info-tip">基準：${o.lbl||'—'}；${orgDescribe('seg:'+s.key,orgRaw('seg:'+s.key),{kind:'wall',h:P().wallH*10}).split('｜')[0]}</div>`:''}</div>`;
   }).join('');
 }
 function setWallOrg(k,f,v){
@@ -1356,7 +1366,8 @@ function onShapeChange(){
 
 // 讀數字欄位：空白才用預設值（0 是有效值）
 function numV(id,def){const v=document.getElementById(id).value;return v===''||isNaN(+v)?def:+v;}
-function P(){
+function P(){const r=_Praw();if(state.floorOrg){const a=anchorOrigin(state.floorOrg,r.tileW,r.tileH);r.originX=a.x/10;r.originY=a.y/10;}return r;}
+function _Praw(){
   const wt=+document.getElementById('wallT').value||0;
   // 輸入欄是室內淨尺寸；roomW/roomH 內部仍為含牆厚的外框
   let rW=(+document.getElementById('roomW').value||260)+wt*2,rH=(+document.getElementById('roomH').value||160)+wt*2;
@@ -1384,6 +1395,7 @@ function P(){
     lCutH:+document.getElementById('lCutH').value||100,
   };
 }
+
 function innerDim(){const p=P();return{iw:p.roomW-p.wallT*2,ih:p.roomH-p.wallT*2};}
 function updateInnerBadge(){const p=P();const d=innerDim();document.getElementById('innerDimBadge').innerHTML=`含牆厚外框：<span style="font-family:var(--mono);font-weight:500">${p.roomW} × ${p.roomH} cm</span>`;}
 
@@ -1617,26 +1629,83 @@ function drawSnapHover(){
   ctx.fillStyle='#FFF';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,bx+5,by+9);
   ctx.restore();
 }
-// ---- 起鋪點數值列：選目前圖面中的某一面，直接輸入或偏移 ----
-function orgBarFaces(){
-  if(state.view==='floor')return[{id:'floor',lbl:'地磚',hint:'X 由左、Y 由上（A 牆）算起'}];
-  return(state._wHits||[]).map(h=>h.kind==='seg'
-    ?{id:'seg:'+h.seg.key,lbl:'壁磚 '+h.seg.tag,hint:'X 由左、Y 由天花板往下算起',h}
-    :{id:'tub:'+h.face.s.id+':'+h.face.edge,lbl:h.face.label,hint:h.face.kind==='deck'?'X 由左、Y 由 A 側算起':'X 由左、Y 由缸緣往下算起',h});
+// ---- 起鋪點：基準點（點選吸附）＋整磚方向（田字）＋偏移（往右／往上為正，cm）----
+// 資料：{ax,ay（基準點，面內 mm，y 往下）, q:'ne'|'nw'|'se'|'sw', dx,dy（cm，右、上為正）, lbl}
+function anchorOrigin(o,tw,th){
+  if(!o)return{x:0,y:0};
+  if(o.ax==null)return{x:(o.x||0)*10,y:(o.y||0)*10}; // 舊資料
+  const P0=anchorPt(o),q=o.q||'se';
+  return{x:q[1]==='w'?P0.x-tw:P0.x,y:q[0]==='n'?P0.y-th:P0.y};
 }
-function orgGet(id){
-  if(id==='floor')return{x:P().originX,y:P().originY};
+function anchorPt(o){return{x:o.ax+(o.dx||0)*10,y:o.ay-(o.dy||0)*10};}
+function smartQ(w,h,ax,ay){return (ay>h/2?'n':'s')+(ax>w/2?'w':'e');}
+// 各面的尺寸、磚尺寸
+function orgSurf(id){
+  const p=P();
+  if(id==='floor'){const d=innerDim();return{kind:'floor',w:d.iw*10,h:d.ih*10,tw:p.tileW,th:p.tileH,tag:'地磚'};}
   const [k,a,b]=id.split(':');
-  if(k==='seg'){const sg=getSeg(a);if(!sg)return{x:0,y:0};const o=segOrigin(sg);return{x:Math.round(o.x)/10,y:Math.round(o.y)/10};}
-  const t=state.stickers.find(s=>String(s.id)===a);const o=t&&(t.faceOrgs||{})[b]||{};return{x:o.x||0,y:o.y||0};
+  if(k==='seg'){const sg=getSeg(a);return sg?{kind:'wall',w:sg.len,h:p.wallH*10,tw:p.wallTileW,th:p.wallTileH,tag:'壁磚 '+(sg.tag||a)}:null;}
+  const f=tubFaces().find(f=>String(f.s.id)===a&&f.edge===b);
+  return f?{kind:f.kind,w:f.w,h:f.h,tw:f.spec.tileW,th:f.spec.tileH,tag:f.label}:null;
 }
-function orgSet(id,x,y){
-  x=Math.round(x*10)/10;y=Math.round(y*10)/10;
-  if(id==='floor'){document.getElementById('originX').value=x;document.getElementById('originY').value=y;}
+// 讀出某一面的起鋪點（一律轉成「基準點」格式）
+function orgRaw(id){
+  const p=P();
+  if(id==='floor'){
+    if(state.floorOrg)return{...state.floorOrg};
+    return{ax:(+document.getElementById('originX').value||0)*10,ay:(+document.getElementById('originY').value||0)*10,q:'se',dx:0,dy:0,lbl:'自訂座標'};
+  }
+  const [k,a,b]=id.split(':');
+  if(k==='seg'){
+    const o=(state.wallOrgs||{})[a]||{};if(o.mode==='anchor'&&o.ax!=null)return{...o};
+    const sg=getSeg(a);const og=sg?segOrigin(sg,p):{x:0,y:0};
+    const ML={auto:'自動',left:'左端起磚',right:'右端起磚',center:'置中',custom:'自訂座標'};
+    return{ax:og.x,ay:og.y,q:'se',dx:0,dy:0,lbl:ML[o.mode||'auto']||'自動'};
+  }
+  const t=state.stickers.find(x=>String(x.id)===a);const o=t&&(t.faceOrgs||{})[b];
+  if(o&&o.ax!=null)return{...o};
+  return{ax:((o&&o.x)||0)*10,ay:((o&&o.y)||0)*10,q:'se',dx:0,dy:0,lbl:'左上角'};
+}
+function orgStore(id,o){
+  o={ax:Math.round(o.ax),ay:Math.round(o.ay),q:o.q||'se',dx:Math.round((o.dx||0)*10)/10,dy:Math.round((o.dy||0)*10)/10,lbl:o.lbl||''};
+  if(id==='floor'){state.floorOrg=o;}
   else{const [k,a,b]=id.split(':');
-    if(k==='seg'){state.wallOrgs=state.wallOrgs||{};state.wallOrgs[a]={mode:'custom',x,y};renderWallOrgPanel(true);}
-    else{const t=state.stickers.find(s=>String(s.id)===a);if(!t)return;t.faceOrgs=t.faceOrgs||{};t.faceOrgs[b]={x,y};if(t.selected)renderTubOrgs(t);}}
-  scheduleRender();
+    if(k==='seg'){state.wallOrgs=state.wallOrgs||{};state.wallOrgs[a]={mode:'anchor',...o};renderWallOrgPanel(true);}
+    else{const t=state.stickers.find(x=>String(x.id)===a);if(!t)return;t.faceOrgs=t.faceOrgs||{};t.faceOrgs[b]=o;if(t.selected)renderTubOrgs(t);}}
+  scheduleRender();setTimeout(()=>updateOrgBar(true),20);
+}
+// 點選吸附後設定基準點（整磚方向依位置自動判斷，偏移歸零）
+function orgSetAnchor(id,x,y,lbl){
+  const sf=orgSurf(id);if(!sf)return;
+  state.orgSel=id;orgStore(id,{ax:x,ay:y,q:smartQ(sf.w,sf.h,x,y),dx:0,dy:0,lbl:lbl||'自由點'});
+}
+function obSetQ(q){const o=orgRaw(state.orgSel);o.q=q;orgStore(state.orgSel,o);}
+function obNudge(sx,sy){
+  const st=Math.abs(+document.getElementById('obStep').value||5),o=orgRaw(state.orgSel);
+  o.dx=(o.dx||0)+sx*st;o.dy=(o.dy||0)+sy*st;orgStore(state.orgSel,o);
+}
+function obResetOff(){const o=orgRaw(state.orgSel);o.dx=0;o.dy=0;orgStore(state.orgSel,o);}
+function obRotate(){const pt=state.orgSel.split(':');if(pt[0]==='tub')toggleTubRot(pt[1],pt[2]);}
+// 數值列
+function orgBarFaces(){
+  if(state.view==='floor')return[{id:'floor',lbl:'地磚'}];
+  return(state._wHits||[]).map(h=>h.kind==='seg'?{id:'seg:'+h.seg.key,lbl:'壁磚 '+h.seg.tag}:{id:'tub:'+h.face.s.id+':'+h.face.edge,lbl:h.face.label});
+}
+const n1=v=>Math.round(v*10)/10;
+function orgDescribe(id,o,sf){
+  const dx=o.dx||0,dy=o.dy||0;
+  const off=(dx||dy)?'從基準'+[dx?(dx>0?'往右 ':'往左 ')+n1(Math.abs(dx))+' cm':'',dy?(dy>0?'往上 ':'往下 ')+n1(Math.abs(dy))+' cm':''].filter(Boolean).join('、'):'沒有偏移';
+  const pt=anchorPt(o),QL={ne:'右上',nw:'左上',se:'右下',sw:'左下'};
+  let pos;
+  if(sf.kind==='floor'){const L=floorSideTag('L'),T=floorSideTag('T');pos=`距${L?' '+L+' ':'左側'}牆 ${n1(pt.x/10)} cm、距${T?' '+T+' ':'上側'}牆 ${n1(pt.y/10)} cm`;}
+  else if(sf.kind==='deck')pos=`距左緣 ${n1(pt.x/10)} cm、距 A 側 ${n1(pt.y/10)} cm`;
+  else pos=`距左端 ${n1(pt.x/10)} cm、離地 ${n1((sf.h-pt.y)/10)} cm`;
+  return `${off}　｜　第一片整磚在${QL[o.q||'se']}，磚角位置：${pos}`;
+}
+// 地磚：左側／上側牆的主牆字母
+function floorSideTag(side){
+  const sm=spaceModel(),g=sm.groups.find(g=>g.ring&&(side==='L'?(g.ring.axis==='v'&&g.ring.side>0&&g.ring.c<1):(g.ring.axis==='h'&&g.ring.side>0&&g.ring.c<1)));
+  return g?g.tag:'';
 }
 let _obSig='';
 function updateOrgBar(force){
@@ -1648,20 +1717,28 @@ function updateOrgBar(force){
   const sel=document.getElementById('obFace'),sig=fs.map(f=>f.id+f.lbl).join('|');
   if(force||sig!==_obSig){_obSig=sig;sel.innerHTML=fs.map(f=>`<option value="${f.id}">${f.lbl}</option>`).join('');}
   sel.value=state.orgSel;sel.style.display=fs.length>1?'':'none';
-  const cur=fs.find(f=>f.id===state.orgSel),v=orgGet(state.orgSel),ae=document.activeElement;
-  ['obX','obY'].forEach((id,i)=>{const el=document.getElementById(id);if(force||ae!==el)el.value=i?v.y:v.x;});
-  document.getElementById('obHint').textContent=(fs.length>1?'':cur.lbl+'：')+cur.hint;
+  const sf=orgSurf(state.orgSel);if(!sf)return;
+  const o=orgRaw(state.orgSel);
+  document.getElementById('obBase').innerHTML=`基準：<b style="color:#C2560F">${o.lbl||'—'}</b>`+(fs.length>1?'':`<span style="color:var(--muted)">（${sf.tag}）</span>`);
+  document.querySelectorAll('#obQuad .obq').forEach(b=>b.classList.toggle('on',b.dataset.q===(o.q||'se')));
+  document.getElementById('obInfo').textContent=orgDescribe(state.orgSel,o,sf)+(state.mode==='origin'?'':'　（按「設定起鋪點」後在圖上點選基準點）');
   const rb=document.getElementById('obRot'),pt=state.orgSel.split(':');
   if(pt[0]==='tub'){const t=state.stickers.find(x=>String(x.id)===pt[1]);if(t){rb.style.display='';rb.textContent='⟳ 磚向 '+tubRotLbl(t,pt[2]);}}else rb.style.display='none';
 }
-function obRotate(){const pt=state.orgSel.split(':');if(pt[0]==='tub')toggleTubRot(pt[1],pt[2]);}
-function orgBarInput(){
-  const x=+document.getElementById('obX').value||0,y=+document.getElementById('obY').value||0;
-  orgSet(state.orgSel,x,y);
-}
-function orgBarOffset(){
-  const v=orgGet(state.orgSel),dx=+document.getElementById('obDX').value||0,dy=+document.getElementById('obDY').value||0;
-  orgSet(state.orgSel,v.x+dx,v.y+dy);setTimeout(()=>updateOrgBar(true),30);
+// 圖面標示：基準點（方塊）、偏移線、第一片整磚（橘色）
+function drawFirstTile(X0,Y0,PX,o,tw,th,W,H,strong){
+  const a={x:o.ax!=null?o.ax:(o.x||0)*10,y:o.ay!=null?o.ay:(o.y||0)*10},pt=o.ax!=null?anchorPt(o):a,org=anchorOrigin(o,tw,th);
+  const cx=v=>X0+v*PX,cy=v=>Y0+v*PX;
+  ctx.save();
+  ctx.beginPath();ctx.rect(X0,Y0,W*PX,H*PX);ctx.clip();
+  ctx.fillStyle=strong?'rgba(240,112,32,.22)':'rgba(240,112,32,.10)';ctx.fillRect(cx(org.x),cy(org.y),tw*PX,th*PX);
+  ctx.strokeStyle='#F07020';ctx.lineWidth=strong?2:1.2;ctx.setLineDash([]);ctx.strokeRect(cx(org.x),cy(org.y),tw*PX,th*PX);
+  ctx.restore();
+  ctx.save();
+  if(pt.x!==a.x||pt.y!==a.y){ctx.strokeStyle='#C2560F';ctx.lineWidth=1;ctx.setLineDash([3,2]);ctx.beginPath();ctx.moveTo(cx(a.x),cy(a.y));ctx.lineTo(cx(pt.x),cy(a.y));ctx.lineTo(cx(pt.x),cy(pt.y));ctx.stroke();ctx.setLineDash([]);}
+  ctx.fillStyle='#fff';ctx.strokeStyle='#C2560F';ctx.lineWidth=1.5;ctx.fillRect(cx(a.x)-4,cy(a.y)-4,8,8);ctx.strokeRect(cx(a.x)-4,cy(a.y)-4,8,8);
+  ctx.beginPath();ctx.arc(cx(pt.x),cy(pt.y),4,0,Math.PI*2);ctx.fillStyle='#F07020';ctx.fill();
+  ctx.restore();
 }
 function setMode(m){
   state.mode=m;
@@ -1674,7 +1751,8 @@ function snapOrigin(pos){
   const d=innerDim();
   const map={tl:[0,0],tc:[d.iw/2,0],tr:[d.iw,0],ml:[0,d.ih/2],mc:[d.iw/2,d.ih/2],mr:[d.iw,d.ih/2],bl:[0,d.ih],bc:[d.iw/2,d.ih],br:[d.iw,d.ih]};
   const [x,y]=map[pos];
-  document.getElementById('originX').value=x;document.getElementById('originY').value=y;scheduleRender();
+  const NM={tl:'左上角',tc:'上緣中點',tr:'右上角',ml:'左緣中點',mc:'正中',mr:'右緣中點',bl:'左下角',bc:'下緣中點',br:'右下角'};
+  orgSetAnchor('floor',x*10,y*10,'房間'+NM[pos]);
 }
 
 // ---- OBSTACLES ----
@@ -2076,12 +2154,11 @@ function renderTubOrgs(s){
   const el=document.getElementById('stTubOrgs');if(!el)return;
   const ids=tubExposedEdges(s).concat(tubDeckOn(s)?['deck']:[]);
   const o=s.faceOrgs||{};
-  el.innerHTML=ids.length?ids.map(k=>{const v=o[k]||{x:0,y:0};
-    return `<div class="row" style="align-items:flex-end;margin-bottom:3px">
-      <div style="width:52px;font-size:11px;color:var(--accent);padding-bottom:7px">${k==='deck'?'檯面':'半牆 '+TUB_EDGE_LBL[k]}</div>
-      <div class="field"><label>X (cm)</label><input type="number" step="0.1" value="${v.x}" oninput="setTubOrg('${k}','x',this.value)"></div>
-      <div class="field"><label>Y (cm)</label><input type="number" step="0.1" value="${v.y}" oninput="setTubOrg('${k}','y',this.value)"></div>
-      <button class="btn btn-sm" style="margin-bottom:2px;white-space:nowrap" title="磚轉 90°" onclick="toggleTubRot('${s.id}','${k}')">⟳ ${tubRotLbl(s,k)}</button>
+  el.innerHTML=ids.length?ids.map(k=>{const id='tub:'+s.id+':'+k,r=orgRaw(id),QL={ne:'右上',nw:'左上',se:'右下',sw:'左下'};
+    return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px">
+      <div style="width:54px;color:var(--accent);font-weight:600">${k==='deck'?'檯面':'半牆 '+TUB_EDGE_LBL[k]}</div>
+      <div style="flex:1;color:var(--muted)">基準 ${r.lbl||'—'}・整磚${QL[r.q||'se']}${(r.dx||r.dy)?'・有偏移':''}</div>
+      <button class="btn btn-sm" style="white-space:nowrap" title="磚轉 90°" onclick="toggleTubRot('${s.id}','${k}')">⟳ ${tubRotLbl(s,k)}</button>
     </div>`;}).join(''):'<div class="info-tip">沒有需要貼磚的半牆或檯面。</div>';
 }
 function tubRotLbl(s,k){const sp=tubFaceSpec(s,k,tubTileSpec(s));return `${sp.tileW/10}×${sp.tileH/10}`;}
@@ -2748,12 +2825,8 @@ function renderFloorView(){
     ctx.fillText(proc.type==='工廠背斜切'?'斜':'角', mx+nx*offset, my+ny*offset);
   });
 
-  // Origin marker
-  const [omx,omy]=toCanvas(wtmm+originXmm,wtmm+originYmm);
-  ctx.strokeStyle='#F07020';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);
-  ctx.beginPath();ctx.moveTo(omx-10,omy);ctx.lineTo(omx+10,omy);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(omx,omy-10);ctx.lineTo(omx,omy+10);ctx.stroke();
-  ctx.setLineDash([]);ctx.beginPath();ctx.arc(omx,omy,4,0,Math.PI*2);ctx.fillStyle='#F07020';ctx.fill();
+  // 起鋪點：基準點＋第一片整磚
+  drawFirstTile(tx(wtmm),ty(wtmm),PX,orgRaw('floor'),p.tileW,p.tileH,innerWmm,innerHmm,true);
 
   // Borders：外牆外框＋內牆線
   ctx.strokeStyle='#1A1916';ctx.lineWidth=2;ctx.setLineDash([]);
@@ -2930,14 +3003,14 @@ function tubFaces(){
     const r=stkFootprint(s),Hmm=stkHeight(s)*10,spec=tubTileSpec(s);
     tubExposedEdges(s).forEach(e=>{
       const w=(e==='n'||e==='s')?r.x2-r.x1:r.y2-r.y1;
-      const og=(s.faceOrgs||{})[e]||{};
-      out.push({kind:'apron',s,edge:e,label:`${s.label}・半牆 ${TUB_EDGE_LBL[e]}`,w,h:Hmm,excl:[],spec:tubFaceSpec(s,e,spec),baseSpec:spec,ox:(og.x||0)*10,oy:(og.y||0)*10});
+      const og=(s.faceOrgs||{})[e],fsp=tubFaceSpec(s,e,spec),oo=anchorOrigin(og,fsp.tileW,fsp.tileH);
+      out.push({kind:'apron',s,edge:e,label:`${s.label}・半牆 ${TUB_EDGE_LBL[e]}`,w,h:Hmm,excl:[],spec:fsp,baseSpec:spec,ox:oo.x,oy:oo.y,org:og});
     });
     if(tubDeckOn(s)){
       // 檯面（平面方向，上 = A 側）：挖掉缸口
       const h=tubHole(s);
-      const og=(s.faceOrgs||{}).deck||{};
-      out.push({kind:'deck',s,edge:'deck',label:`${s.label}・檯面`,w:r.x2-r.x1,h:r.y2-r.y1,excl:[{x1:h.x1-r.x1,y1:h.y1-r.y1,x2:h.x2-r.x1,y2:h.y2-r.y1,type:'tubHole'}],spec:tubFaceSpec(s,'deck',spec),baseSpec:spec,ox:(og.x||0)*10,oy:(og.y||0)*10});
+      const og=(s.faceOrgs||{}).deck,fsp=tubFaceSpec(s,'deck',spec),oo=anchorOrigin(og,fsp.tileW,fsp.tileH);
+      out.push({kind:'deck',s,edge:'deck',label:`${s.label}・檯面`,w:r.x2-r.x1,h:r.y2-r.y1,excl:[{x1:h.x1-r.x1,y1:h.y1-r.y1,x2:h.x2-r.x1,y2:h.y2-r.y1,type:'tubHole'}],spec:fsp,baseSpec:spec,ox:oo.x,oy:oo.y,org:og});
     }
   });
   return out;
@@ -3035,7 +3108,7 @@ function renderTubFaceView(f){
     drawDimGroup('h',1,Y+hPX,xs,v=>X+v*PX,18);drawDimGroup('v',-1,X,ys,v=>Y+v*PX,14);}
   ctx.fillStyle='#7A776E';ctx.font='10px DM Mono,Noto Sans TC,monospace';ctx.textAlign='center';ctx.textBaseline='top';
   ctx.fillText(`${f.spec.name} ${f.spec.tileW/10}×${f.spec.tileH/10} cm`+(f.kind==='deck'?'　（上＝A 側）':''),X+wPX/2,Y+hPX+66);
-  drawOrgMark(X+(f.ox||0)*PX,Y+(f.oy||0)*PX,X,Y,wPX,hPX);
+  drawFirstTile(X,Y,PX,orgRaw('tub:'+f.s.id+':'+f.edge),f.spec.tileW,f.spec.tileH,f.w,f.h,true);
   drawSnapHover();updateOrgBar();renderMiniMap();
 }
 // 壁磚圖切換清單：各面牆＋浴缸貼磚面
@@ -3366,7 +3439,7 @@ function renderWallView(){
     });
   }
   // 各段起鋪點標記
-  state._wHits.forEach(h=>{const o=segOrigin(h.seg,p);drawOrgMark(h.X+o.x*h.PX,h.Y+o.y*h.PX,h.X,h.Y,h.w*h.PX,h.h*h.PX);
+  state._wHits.forEach(h=>{const id='seg:'+h.seg.key;drawFirstTile(h.X,h.Y,h.PX,orgRaw(id),p.wallTileW,p.wallTileH,h.w,h.h,state.orgSel===id||state._wHits.length===1);
     if(state.orgSel==='seg:'+h.seg.key&&state._wHits.length>1){ctx.save();ctx.strokeStyle='#F07020';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.strokeRect(h.X-3,h.Y-3,h.w*h.PX+6,h.h*h.PX+6);ctx.restore();}});
   drawSnapHover();updateOrgBar();renderMiniMap();
 }
@@ -4314,15 +4387,9 @@ function hitTestSticker(s,ix,iy,p,d,wtmm){
 canvas.addEventListener('mousedown',e=>{
   if(state.view==='wall'&&state.mode==='origin'){
     const rc=canvas.getBoundingClientRect(),r=wallSnapAt(e.clientX-rc.left,e.clientY-rc.top);if(!r)return;
-    const x=Math.round(r.x)/10,y=Math.round(r.y)/10;
-    if(r.hit.kind==='seg'){
-      state.wallOrgs=state.wallOrgs||{};state.wallOrgs[r.hit.seg.key]={mode:'custom',x,y};renderWallOrgPanel(true);state.orgSel='seg:'+r.hit.seg.key;
-    }else{
-      state.orgSel='tub:'+r.hit.face.s.id+':'+r.hit.face.edge;
-      const s=r.hit.face.s;s.faceOrgs=s.faceOrgs||{};s.faceOrgs[r.hit.face.edge]={x,y};
-      if(s.selected)renderTubOrgs(s);
-    }
-    scheduleRender();setTimeout(()=>updateOrgBar(true),30);return;
+    const id=r.hit.kind==='seg'?'seg:'+r.hit.seg.key:'tub:'+r.hit.face.s.id+':'+r.hit.face.edge;
+    const tag=r.hit.kind==='seg'?r.hit.seg.tag+' ':'';
+    orgSetAnchor(id,r.x,r.y,(r.lbl?tag+r.lbl:tag+'自由點'));return;
   }
   if(state.view!=='floor')return;
   const rect=canvas.getBoundingClientRect();
@@ -4333,9 +4400,7 @@ canvas.addEventListener('mousedown',e=>{
 
   if(state.mode==='origin'){
     const r=floorSnapAt(cx,cy);if(!r)return;
-    document.getElementById('originX').value=Math.round(r.x)/10;
-    document.getElementById('originY').value=Math.round(r.y)/10;
-    scheduleRender();setTimeout(()=>updateOrgBar(true),30);return;
+    orgSetAnchor('floor',r.x,r.y,r.lbl||'自由點');return;
   }
 
   if(state.mode==='select'&&V3.renderer){return;}
@@ -4464,7 +4529,7 @@ function exportJSON(){
       lShape:p.lShape,lCorner:p.lCorner,lCutW:p.lCutW,lCutH:p.lCutH,
       roomShape:document.getElementById('roomShape').value
     },
-    version2:{space:{steps:state.space.steps},wallOrgs:state.wallOrgs||{},spaceDone:!!state.spaceDone},
+    version2:{space:{steps:state.space.steps},wallOrgs:state.wallOrgs||{},floorOrg:state.floorOrg||null,spaceDone:!!state.spaceDone},
     obstacles:state.obstacles,
     stickers:state.stickers,
     procs:state.procs
@@ -4492,7 +4557,7 @@ function importJSON(e){
       setV('roomShape',pm.roomShape||'rect');
       const v2=data.version2||{};
       state.space={steps:(v2.space&&v2.space.steps)||[]};
-      state.wallOrgs=v2.wallOrgs||{};
+      state.wallOrgs=v2.wallOrgs||{};state.floorOrg=v2.floorOrg||null;
       _space.key='';_space.model=null; // 重新建立空間，不做牆面換算
       state.obstacles=data.obstacles||[];
       state.stickers=data.stickers||[];
