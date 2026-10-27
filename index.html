@@ -650,6 +650,7 @@ canvas{display:block}
     <div id="obsWinRow" class="row" style="display:none">
       <div class="field"><label>窗高 (cm)</label><input type="number" id="obsWinH" value="120" min="10" max="400"></div>
       <div class="field"><label>離地 (cm)</label><input type="number" id="obsWinSill" value="90" min="0" max="400"></div>
+      <div class="field" title="窗框退進牆面的深度，窗洞四周側面要貼壁磚收邊"><label>窗框內退 (cm)</label><input type="number" id="obsWinRev" value="10" min="0" max="50"></div>
     </div>
     <div id="obsWallRow" class="row" style="display:none!important">
       <div class="field"><label>在哪面牆</label>
@@ -707,6 +708,7 @@ canvas{display:block}
     <div class="row" id="editWinRow" style="display:none">
       <div class="field"><label>窗高 (cm)</label><input type="number" id="editWinH" value="120" min="10" max="400"></div>
       <div class="field"><label>離地 (cm)</label><input type="number" id="editWinSill" value="90" min="0" max="400"></div>
+      <div class="field" title="窗框退進牆面的深度，窗洞四周側面要貼壁磚收邊"><label>窗框內退 (cm)</label><input type="number" id="editWinRev" value="10" min="0" max="50"></div>
     </div>
     <div class="row" id="editXYRow">
       <div class="field"><label id="editXLabel">X (cm)</label><input type="number" id="editX" step="0.5"></div>
@@ -1965,6 +1967,7 @@ function addObs(){
   if(obs.type==='window'){
     obs.winH=+document.getElementById('obsWinH').value||120;
     obs.winSill=+document.getElementById('obsWinSill').value||90;
+    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);
   }
   state.obstacles.push(obs);
   renderObsList();scheduleRender();
@@ -1993,6 +1996,7 @@ function showEditBox(o){
   if(o.type==='window'){
     document.getElementById('editWinH').value=o.winH||120;
     document.getElementById('editWinSill').value=o.winSill||90;
+    document.getElementById('editWinRev').value=winRev(o);
   }
   if(isW&&document.getElementById('editWallSel'))document.getElementById('editWallSel').value=o.wall||defaultWallKey();
   if(isW)document.getElementById('editWallHint').textContent='📌 嵌於'+segLabel(o.wall||defaultWallKey())+'牆厚，X 從該牆起點（左/上端）量起';
@@ -2007,6 +2011,7 @@ function applyEdit(){
   if(o.type==='window'){
     o.winH=+document.getElementById('editWinH').value||120;
     o.winSill=+document.getElementById('editWinSill').value||90;
+    o.winRev=Math.max(0,+document.getElementById('editWinRev').value||0);
   }
   if(WALL_TYPES.has(o.type)){
     o.wall=document.getElementById('editWallSel').value;o.h=p.wallT;
@@ -2038,6 +2043,7 @@ function addObsFromModal(){
   if(obs.type==='window'){
     obs.winH=+document.getElementById('obsWinH').value||120;
     obs.winSill=+document.getElementById('obsWinSill').value||90;
+    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);
   }
   closeObsAddModal();
   startPlacing('obs',obs);
@@ -3434,8 +3440,9 @@ function calculateWallTiles(){
     facePieces('seg:'+seg.key).filter(pc=>pc.code==='main').forEach(pc=>{if(pc.isPartial)cuts.push(pc);else full++;});
   });
   const sources=pairCuts(cuts,0);
-  const order=Math.ceil((full+sources)*(1+p.wallWaste/100));
-  return{full,cut:cuts.length,sources,order};
+  const rv=revealStats().main||null;
+  const order=Math.ceil((full+sources+(rv?rv.tiles:0))*(1+p.wallWaste/100));
+  return{full,cut:cuts.length,sources,order,reveal:rv};
 }
 // 壁磚編號（與地磚相同規則）：整磚依牆面順序 1、2、3…，裁切磚接續編號，同一片磚切兩塊標 a／b（可能跨不同牆面）
 // 浴缸半牆／檯面另外編號，前面加 T
@@ -3635,13 +3642,54 @@ function tileGroupKey(id,pc){
   if(pc.code&&pc.code!=='main')return pc.code;
   return id.startsWith('tub:')?'T'+pc.spec.key:'main';
 }
+// ---- 窗洞收邊：窗框內退 winRev cm，窗洞上下左右四個側面貼壁磚 ----
+function winRev(o){return o.winRev!=null?+o.winRev:10;}
+// 每個窗：用哪種磚（窗所在位置那段的磚）、四邊長度
+function windowReveals(){
+  const p=P(),d=innerDim(),H=p.wallH*10,out=[];
+  wallSegs(p,d).forEach(sg=>{
+    const id='seg:'+sg.key,base=faceBase(id);if(!base)return;
+    const zs=faceZones(id,base);
+    base.excl.filter(e=>e.type==='window'&&e.rev>0).forEach(e=>{
+      const cy=(e.y1+e.y2)/2,z=zs.find(z=>cy>=z.y0&&cy<=z.y1)||zs[0];
+      const w=e.x2-e.x1,h=e.y2-e.y1;
+      out.push({face:id,seg:sg,label:e.label||'窗',spec:z.spec,key:(z.spec.code&&z.spec.code!=='main')?z.spec.code:'main',D:e.rev,lens:[w,w,h,h]});
+    });
+  });
+  return out;
+}
+// 依磚種估算收邊用磚：磚沿長邊裁成 D 寬的長條，一片可裁 floor(短邊/D) 條；各邊長度依序排入長條（餘料可接用）
+function revealStats(){
+  const G={};
+  windowReveals().forEach(r=>{
+    const g=G[r.key]||(G[r.key]={spec:r.spec,wins:[],segs:[],D:0});
+    g.wins.push(r);
+    const L=Math.max(r.spec.tileW,r.spec.tileH);
+    r.lens.forEach(len=>{let x=len;while(x>L+0.5){g.segs.push({len:L,D:r.D});x-=L;}if(x>0.5)g.segs.push({len:x,D:r.D});});
+  });
+  Object.values(G).forEach(g=>{
+    const L=Math.max(g.spec.tileW,g.spec.tileH),S=Math.min(g.spec.tileW,g.spec.tileH);
+    // 不同深度分開裁條
+    const byD={};g.segs.forEach(s=>(byD[s.D]=byD[s.D]||[]).push(s.len));
+    g.pieces=g.segs.length;g.strips=0;g.tiles=0;
+    Object.entries(byD).forEach(([D,lens])=>{
+      const bins=[];lens.sort((a,b)=>b-a).forEach(l=>{const i=bins.findIndex(r=>r>=l-0.5);if(i>=0)bins[i]-=l;else bins.push(L-l);});
+      const per=Math.max(1,Math.floor(S/(+D)));
+      g.strips+=bins.length;g.tiles+=Math.ceil(bins.length/per);
+    });
+    g.D=[...new Set(g.wins.map(w=>w.D/10))].join('／');
+  });
+  return G;
+}
 // 依磚種統計：{key:{spec,full,cut,sources,order,faces:Set}}
 function tileGroupStats(){
   const G={};
   allFaceIds().forEach(id=>{facePieces(id).forEach(pc=>{
     const k=tileGroupKey(id,pc),g=G[k]||(G[k]={spec:pc.spec,full:0,cuts:[],faces:new Set(),all:[]});
     g.all.push({face:id,pc});g.faces.add(id);if(pc.isPartial)g.cuts.push(pc);else g.full++;});});
-  Object.values(G).forEach(g=>{g.cut=g.cuts.length;g.sources=pairCuts(g.cuts,0);g.order=Math.ceil((g.full+g.sources)*(1+(g.spec.waste||0)/100));});
+  const RV=revealStats();
+  Object.entries(RV).forEach(([k,r])=>{if(!G[k])G[k]={spec:r.spec,full:0,cuts:[],faces:new Set(),all:[]};G[k].reveal=r;r.wins.forEach(w=>G[k].faces.add(w.face));});
+  Object.values(G).forEach(g=>{g.cut=g.cuts.length;g.sources=pairCuts(g.cuts,0);g.order=Math.ceil((g.full+g.sources+(g.reveal?g.reveal.tiles:0))*(1+(g.spec.waste||0)/100));});
   return G;
 }
 function wallNumbering(){
@@ -3734,7 +3782,7 @@ function wallObsExclusions(wallKey, surfW, wallHmm){
         fY2=wallHmm-sillMm;
         fY1=fY2-winHmm;
       }
-      return{x1:Math.max(0,fX),y1:Math.max(0,fY1),x2:Math.min(surfW,fX+fW),y2:Math.min(wallHmm,fY2),type:o.type,label:o.label,hingeL:((o.swing||'left')==='left')!==flip};
+      return{x1:Math.max(0,fX),y1:Math.max(0,fY1),x2:Math.min(surfW,fX+fW),y2:Math.min(wallHmm,fY2),type:o.type,label:o.label,rev:o.type==='window'?winRev(o)*10:0,hingeL:((o.swing||'left')==='left')!==flip};
     }));
 }
 
@@ -3752,7 +3800,11 @@ function drawElevation(seg,X,Y,p,PX,wallHmm,wallTP){
       ctx.beginPath();ctx.rect(ex,ey,ew,eh);ctx.clip();ctx.strokeStyle='#BDB6AA';ctx.lineWidth=0.8;ctx.setLineDash([]);
       for(let i=-eh;i<ew;i+=7){ctx.beginPath();ctx.moveTo(ex+i,ey+eh);ctx.lineTo(ex+i+eh,ey);ctx.stroke();}
       ctx.restore();return;}
-    if(e.type==='door')drawDoorElev(ex,ey,ew,eh,PX,e.hingeL);else drawWindowElev(ex,ey,ew,eh,PX);
+    if(e.type==='door')drawDoorElev(ex,ey,ew,eh,PX,e.hingeL);
+    else if(state._tex3D&&e.rev>0)ctx.clearRect(ex,ey,ew,eh); // 3D：開口挖空，窗洞側面另做立體面
+    else{const b=Math.min((e.rev||0)*PX,ew/3,eh/3);
+      if(b>0)drawRevealElev(ex,ey,ew,eh,b);
+      drawWindowElev(ex+b,ey+b,ew-b*2,eh-b*2,PX);}
   });
   if(!state._skipStk)drawWallStickersOnFace(seg.key,X,Y,seg.len,wallHmm,seg.flip,PX);
 }
@@ -3779,6 +3831,15 @@ function drawDoorElev(x,y,w,h,PX,hingeL){
     ctx.lineWidth=1.1;ctx.beginPath();ctx.arc(cx,hy,r,0,Math.PI*2);ctx.fillStyle='#FBFBF9';ctx.fill();ctx.stroke();
     const t=Math.max(1.5,12*PX);ctx.beginPath();ctx.rect(Math.min(cx,cx+dl),hy-t/2,Math.abs(dl),t);ctx.stroke();
   }
+  ctx.restore();
+}
+// 窗洞收邊：窗框內退，四周側面貼壁磚（立面以內框帶表示）
+function drawRevealElev(x,y,w,h,b){
+  ctx.save();ctx.setLineDash([]);
+  ctx.fillStyle='#E9E3D6';ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle='#9C968A';ctx.lineWidth=0.8;
+  ctx.beginPath();[[x,y,x+b,y+b],[x+w,y,x+w-b,y+b],[x,y+h,x+b,y+h-b],[x+w,y+h,x+w-b,y+h-b]].forEach(([a,c,d,e])=>{ctx.moveTo(a,c);ctx.lineTo(d,e);});ctx.stroke();
+  ctx.strokeStyle='#2B2F31';ctx.lineWidth=1.4;ctx.strokeRect(x,y,w,h);
   ctx.restore();
 }
 // 窗立面：雙線窗框、中間分隔成兩扇，玻璃斜反光線
@@ -4063,7 +4124,7 @@ function renderWallView(){
 
   ctx.font='10px DM Mono,monospace';ctx.textBaseline='top';
   if(!g.free)[[lX,0],[rX,1]].forEach(([x0,si])=>{
-    const t=sideIn[si]?(FLANK>0?`牆厚 ${p.wallT} cm`:'陰角'):'陽角';
+    const t=sideIn[si]?(FLANK>0?'':'陰角'):'陽角';if(!t)return;
     ctx.fillStyle=sideIn[si]?'#7A776E':'#C0392B';ctx.fillText(t,x0+Math.max(flankPX,24)/2,top+hPX+62);
   });
   ctx.strokeStyle='#C0392B';ctx.lineWidth=2.5;
@@ -4421,7 +4482,7 @@ function build3D(){
   // ---- 牆面 ----
   wallSegs(p,d).forEach(seg=>{
     if(seg.len<=0)return;
-    const cv=offscreenSurface(seg.len,Hmm,s=>{state._skipStk=true;try{drawElevation(seg,0,0,p,s,Hmm,wallTP);}finally{state._skipStk=false;}});
+    const cv=offscreenSurface(seg.len,Hmm,s=>{state._skipStk=true;state._tex3D=true;try{drawElevation(seg,0,0,p,s,Hmm,wallTP);}finally{state._skipStk=false;state._tex3D=false;}});
     const L=seg.len/10;
     const geo=new THREE.PlaneGeometry(L,H);geo.translate(L/2,H/2,0);
     // 立面 X 方向 u、室內法線 z（正面朝室內，從室內看貼圖方向正確）
@@ -4430,11 +4491,12 @@ function build3D(){
     const xv=new THREE.Vector3(u.x,0,u.y),yv=new THREE.Vector3(0,1,0),zv=new THREE.Vector3(-u.y,0,u.x);
     const m=new THREE.Matrix4().makeBasis(xv,yv,zv).setPosition(P0.x/10,0,P0.y/10);
     const isCol=seg.kind!=='wall';
-    const mat=new THREE.MeshBasicMaterial({map:texFrom(cv),side:isCol?THREE.FrontSide:THREE.DoubleSide});
+    const mat=new THREE.MeshBasicMaterial({map:texFrom(cv),alphaTest:0.5,side:isCol?THREE.FrontSide:THREE.DoubleSide});
     const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;mesh.matrix.copy(m);
     const edges=edgeLines(geo,0x1A1916,0.9);mesh.add(edges);
     {const o=segOrigin(seg,p),ex=wallObsExclusions(seg.key,seg.len,Hmm);
-     mesh.add(tileLines3D(facePieces('seg:'+seg.key),ex,(x,y)=>new THREE.Vector3(x/10,H-y/10,0.2)));}
+     mesh.add(tileLines3D(facePieces('seg:'+seg.key),ex,(x,y)=>new THREE.Vector3(x/10,H-y/10,0.2)));
+     addWindowReveals3D(mesh,seg,ex,H);}
     root.add(mesh);
     const sp=letterSprite(seg.tag||seg.key);
     sp.position.set(P0.x/10+u.x*L/2,H+14,P0.y/10+u.y*L/2);
@@ -4822,6 +4884,36 @@ function makeMirrorCab3D(s,dp){
   g.add(m);return g;
 }
 
+// ---- 3D：窗洞收邊（窗框內退，四周側面貼磚，窗在內退處）----
+function revealStripTex(lenmm,Dmm,vertical,spec){
+  const w=vertical?Dmm:lenmm,h=vertical?lenmm:Dmm;
+  return offscreenSurface(w,h,s=>{
+    ctx.fillStyle=spec&&spec.color?spec.color:tileFill(true);ctx.fillRect(0,0,w*s,h*s);
+    if(spec&&spec.color){ctx.fillStyle='rgba(240,190,90,.30)';ctx.fillRect(0,0,w*s,h*s);}
+    const L=Math.max(spec.tileW,spec.tileH),g=spec.grout||0;
+    ctx.strokeStyle='#A8A296';ctx.lineWidth=Math.max(1,g*s,1.5);
+    ctx.strokeRect(0,0,w*s,h*s);
+    for(let t=L;t<lenmm-1;t+=L+g){ctx.beginPath();if(vertical){ctx.moveTo(0,(lenmm-t)*s);ctx.lineTo(w*s,(lenmm-t)*s);}else{ctx.moveTo(t*s,0);ctx.lineTo(t*s,h*s);}ctx.stroke();}
+  });
+}
+function addWindowReveals3D(mesh,seg,ex,H){
+  const id='seg:'+seg.key,base=faceBase(id),zs=base?faceZones(id,base):[];
+  ex.filter(e=>e.type==='window'&&e.rev>0).forEach(e=>{
+    const cy=(e.y1+e.y2)/2,z=zs.find(z=>cy>=z.y0&&cy<=z.y1)||zs[0];const spec=z?z.spec:{tileW:P().wallTileW,tileH:P().wallTileH,grout:P().wallGrout};
+    const wmm=e.x2-e.x1,hmm=e.y2-e.y1,D=e.rev/10,w=wmm/10,h=hmm/10;
+    const X1=e.x1/10,X2=e.x2/10,Yt=H-e.y1/10,Yb=H-e.y2/10;
+    const mk=(geo,cv,pos)=>{const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:texFrom(cv),side:THREE.DoubleSide}));m.position.set(...pos);m.add(edgeLines(geo,0x6E6A62,0.9));mesh.add(m);};
+    // 上（窗楣）、下（窗台）：寬 w、深 D
+    const top=new THREE.PlaneGeometry(w,D);top.rotateX(Math.PI/2);mk(top,revealStripTex(wmm,e.rev,false,spec),[X1+w/2,Yt,-D/2]);
+    const bot=new THREE.PlaneGeometry(w,D);bot.rotateX(-Math.PI/2);mk(bot,revealStripTex(wmm,e.rev,false,spec),[X1+w/2,Yb,-D/2]);
+    // 左右側：深 D、高 h
+    const l=new THREE.PlaneGeometry(D,h);l.rotateY(Math.PI/2);mk(l,revealStripTex(hmm,e.rev,true,spec),[X1,Yb+h/2,-D/2]);
+    const r=new THREE.PlaneGeometry(D,h);r.rotateY(-Math.PI/2);mk(r,revealStripTex(hmm,e.rev,true,spec),[X2,Yb+h/2,-D/2]);
+    // 窗：在內退深度處
+    const wcv=offscreenSurface(wmm,hmm,s=>{drawWindowElev(0,0,wmm*s,hmm*s,s);});
+    const wg=new THREE.PlaneGeometry(w,h);mk(wg,wcv,[X1+w/2,Yb+h/2,-D]);
+  });
+}
 // ---- 3D：位置換算 ----
 function wallBasis(seg){
   const u=seg.axis==='h'?{x:seg.flip?-1:1,y:0}:{x:0,y:seg.flip?-1:1};
@@ -5410,7 +5502,7 @@ function showSummaryModal(){
   document.getElementById('mWallStatCut').textContent=wr.cut;
   document.getElementById('mWallStatOrder').textContent=wr.order;
   document.getElementById('mWallSpec').innerHTML=tileSpecHtml({tileW:p.wallTileW,tileH:p.wallTileH},(G0.main&&G0.main.all)||[]);
-  document.getElementById('mWallNote').textContent=p.wallWaste>0?`建議叫貨已含 ${p.wallWaste}% 損耗`:'（損耗 0%，請依現場條件自行調整）';
+  document.getElementById('mWallNote').innerHTML=revealNote(wr.reveal)+(p.wallWaste>0?`建議叫貨已含 ${p.wallWaste}% 損耗`:'（損耗 0%，請依現場條件自行調整）');
   // 嵌入式浴缸（半牆＋檯面）
   const tr=calculateTubTiles();
   document.getElementById('mTubBlock').innerHTML=tr.map(t=>`<div class="sum-col">
@@ -5434,8 +5526,12 @@ function showSummaryModal(){
       <div class="modal-stat" style="grid-column:span 2"><div class="modal-stat-l">建議叫貨</div><div class="modal-stat-v" style="color:var(--accent)">${g.order}</div><div class="modal-stat-u">片</div></div>
     </div>
     <div class="modal-spec">${tileSpecHtml(sp,g.all)}</div>
-    <div class="modal-note">使用面：${[...g.faces].map(faceName).join('、')}${sp.waste?`　已含 ${sp.waste}% 損耗`:''}</div></div>`;}).join('');
+    <div class="modal-note">${revealNote(g.reveal)}使用面：${[...g.faces].map(faceName).join('、')}${sp.waste?`　已含 ${sp.waste}% 損耗`:''}</div></div>`;}).join('');
   document.getElementById('summaryModal').classList.remove('hidden');
+}
+function revealNote(r){
+  if(!r)return'';
+  return `<div style="margin-bottom:4px;color:var(--text)">含窗洞收邊（${r.wins.length} 個窗，內退 ${r.D} cm）：${r.pieces} 段、裁 ${r.strips} 條，約 <b>${r.tiles}</b> 片磚</div>`;
 }
 function closeSummaryModal(){document.getElementById('summaryModal').classList.add('hidden');}
 
