@@ -473,7 +473,7 @@ canvas{display:block}
       <span class="tag" data-proc="現場導角" onclick="selProcType(this,'現場導角')">現場導角</span>
     </div>
     <div id="procList" style="margin-bottom:6px"></div>
-    <button class="btn btn-sm btn-d" onclick="clearProcs()">清除所有標記</button>
+    <button class="btn btn-sm btn-d" onclick="askClearProcs()">清除所有標記</button>
     </div><!-- /sb-body sbProc -->
   </div>
 
@@ -492,6 +492,13 @@ canvas{display:block}
 </div><!-- sidebar -->
 
 <!-- 磚量統計 Modal -->
+<div class="modal-overlay hidden" id="clrProcModal" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal" style="max-width:340px">
+    <div class="modal-title">清除所有加工標記？</div>
+    <div style="font-size:13px;color:var(--text);line-height:1.6">目前共 <b id="clrProcN">0</b> 個標記（工廠背斜、現場導角），清除後統計的工廠加工也會一起歸零。<br><span style="color:var(--muted);font-size:12px">清錯可按 ↶ 上一步復原。</span></div>
+    <div class="modal-btns" style="margin-top:14px"><button class="btn btn-sm" onclick="document.getElementById('clrProcModal').classList.add('hidden')">取消</button><button class="btn btn-sm btn-d" onclick="clearProcs()">確認清除</button></div>
+  </div>
+</div>
 <div class="modal-overlay hidden" id="summaryModal" onclick="if(event.target===this)closeSummaryModal()">
   <div class="modal">
     <div class="modal-title">磚量統計</div>
@@ -783,13 +790,14 @@ canvas{display:block}
     <!-- 壁磚圖導覽（切換主角面） -->
     <span id="v3dCtrl" style="display:none;align-items:center;gap:8px">
       <button class="btn btn-sm" onclick="if(V3.renderer){reset3DView();draw3D();}">重設視角</button>
+      <button class="mode-btn active" id="mode3dSelect" onclick="setMode('select')">檢視</button>
       <button class="mode-btn" id="mode3dProc" onclick="setMode(state.mode==='proc'?'select':'proc')">加工標記</button>
       <span id="proc3dType" style="display:none;align-items:center;gap:4px;font-size:12px">
         <select onchange="state.procType=this.value;document.querySelectorAll('#procTypeTags .tag').forEach(t=>t.classList.toggle('active',t.dataset.proc===this.value))" style="width:auto;padding:3px 6px">
           <option value="工廠背斜">工廠背斜</option><option value="現場導角">現場導角</option></select>
       </span>
       <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" checked onchange="V3.hideFront=this.checked;draw3D()">隱藏前方牆面</label>
-      <span id="placeHint" style="display:none;align-items:center;padding:3px 8px;border-radius:4px;background:#2F7BD8;color:#fff;font-size:12px"></span>
+      <span id="placeHint" style="display:none;align-items:center;padding:3px 8px;border-radius:4px;background:#2F7BD8;color:#fff;font-size:12px;position:fixed;z-index:50;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.18);left:-999px;top:-999px"></span>
       <span class="info-tip" id="v3dHelp" title="拖曳空白處旋轉・拖曳設備移動・右鍵或 Shift 拖曳平移・滾輪縮放・Delete 刪除">拖曳旋轉・右鍵平移・滾輪縮放・Del 刪除</span>
     </span>
     <span id="wallNavCtrl" style="display:none;align-items:center;gap:6px">
@@ -2013,7 +2021,7 @@ function setMode(m){
   if(m!=='wzone'){state.wzDraft=null;state.wzCursor=null;}
   if(m==='wzone')canvas.style.cursor='crosshair';
   if(typeof updateFtBar==='function')updateFtBar();
-  {const b=document.getElementById('mode3dProc');if(b)b.classList.toggle('active',m==='proc');
+  {const b=document.getElementById('mode3dProc');if(b)b.classList.toggle('active',m==='proc');{const sb=document.getElementById('mode3dSelect');if(sb)sb.classList.toggle('active',m!=='proc');}
    const tg=document.getElementById('proc3dType');if(tg)tg.style.display=m==='proc'?'flex':'none';
    const hp=document.getElementById('v3dHelp');if(hp)hp.style.display=m==='proc'?'none':'';
    if(m!=='proc'){const ph=document.getElementById('placeHint');if(ph&&!(typeof V3!=='undefined'&&V3.placing))ph.style.display='none';}
@@ -2579,7 +2587,17 @@ function drawFaceProcs(face,X,Y,PXv){
 const sameEdge=(a,b)=>Math.abs(a.x1-b.x1)<1&&Math.abs(a.y1-b.y1)<1&&Math.abs(a.x2-b.x2)<1&&Math.abs(a.y2-b.y2)<1;
 function selProcType(el,type){document.querySelectorAll('#procTypeTags .tag').forEach(t=>t.classList.remove('active'));el.classList.add('active');state.procType=type;}
 function goProc3D(){if(!state.spaceDone)return;if(state.view!=='unfold')setView('unfold');setMode('proc');const b=document.getElementById('sbProc');if(b&&b.classList.contains('hidden'))toggleSb('sbProc');}
-function clearProcs(){state.procs=[];renderProcList();scheduleRender();}
+// 提示文字跟著滑鼠（浮在畫面上，不佔工具列位置）
+let _mx=-999,_my=-999;
+document.addEventListener('mousemove',e=>{_mx=e.clientX;_my=e.clientY;placeHintPos();},true);
+function placeHintPos(){const h=document.getElementById('placeHint');if(!h||h.style.display==='none')return;
+  const w=h.offsetWidth,ht=h.offsetHeight;let x=_mx+16,y=_my+18;if(x+w>innerWidth-6)x=_mx-16-w;if(y+ht>innerHeight-6)y=_my-18-ht;if(h.style.left!==x+'px')h.style.left=x+'px';if(h.style.top!==y+'px')h.style.top=y+'px';}
+new MutationObserver(()=>placeHintPos()).observe(document.getElementById('placeHint'),{attributes:true,attributeFilter:['style'],childList:true,characterData:true,subtree:true});
+function askClearProcs(){
+  const n=(state.procs||[]).length;if(!n)return;
+  document.getElementById('clrProcN').textContent=n;document.getElementById('clrProcModal').classList.remove('hidden');
+}
+function clearProcs(){document.getElementById('clrProcModal').classList.add('hidden');state.procs=[];renderProcList();scheduleRender();}
 function renderProcList(){
   const el=document.getElementById('procList');
   if(!state.procs.length){el.innerHTML='<div style="font-size:11px;color:var(--faint)">尚未標記</div>';return;}
