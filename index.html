@@ -659,6 +659,7 @@ canvas{display:block}
       <div class="field"><label>窗高 (cm)</label><input type="number" id="obsWinH" value="120" min="10" max="400"></div>
       <div class="field"><label>離地 (cm)</label><input type="number" id="obsWinSill" value="90" min="0" max="400"></div>
       <div class="field" title="窗框退進牆面的深度，窗洞四周側面要貼壁磚收邊"><label>窗框內退 (cm)</label><input type="number" id="obsWinRev" value="10" min="0" max="50"></div>
+      <div class="field"><label>窗側排法</label><select id="obsWinRevJoin"><option value="whole">整條</option><option value="align">對壁磚縫</option></select></div>
       <div class="field"><label>窗側收邊</label><select id="obsWinRevProc"><option value="none">不加工</option><option value="bevel">工廠背斜</option></select></div>
     </div>
     <div id="obsWallRow" class="row" style="display:none!important">
@@ -718,6 +719,7 @@ canvas{display:block}
       <div class="field"><label>窗高 (cm)</label><input type="number" id="editWinH" value="120" min="10" max="400"></div>
       <div class="field"><label>離地 (cm)</label><input type="number" id="editWinSill" value="90" min="0" max="400"></div>
       <div class="field" title="窗框退進牆面的深度，窗洞四周側面要貼壁磚收邊"><label>窗框內退 (cm)</label><input type="number" id="editWinRev" value="10" min="0" max="50"></div>
+      <div class="field"><label>窗側排法</label><select id="editWinRevJoin"><option value="whole">整條</option><option value="align">對壁磚縫</option></select></div>
       <div class="field"><label>窗側收邊</label><select id="editWinRevProc"><option value="none">不加工</option><option value="bevel">工廠背斜</option></select></div>
     </div>
     <div class="row" id="editXYRow">
@@ -1709,7 +1711,7 @@ function wallProcAt(cx,cy){
   const hs=state._wHits||[];const inR=(h,m)=>cx>=h.X-m&&cx<=h.X+h.w*h.PX+m&&cy>=h.Y-m&&cy<=h.Y+h.h*h.PX+m;
   const h=hs.find(h=>inR(h,0))||hs.find(h=>inR(h,8));if(!h)return null;
   const face=h.kind==='seg'?'seg:'+h.seg.key:'tub:'+h.face.s.id+':'+h.face.edge;
-  const e=edgeNear(facePieces(face),(cx-h.X)/h.PX,(cy-h.Y)/h.PX,10/h.PX);
+  const e=edgeNear(facePieces(face),(cx-h.X)/h.PX,(cy-h.Y)/h.PX,10/h.PX,faceExcl(face));
   return e?{face,e,h}:null;
 }
 function drawWallProcHover(){
@@ -1979,7 +1981,7 @@ function addObs(){
   if(obs.type==='window'){
     obs.winH=+document.getElementById('obsWinH').value||120;
     obs.winSill=+document.getElementById('obsWinSill').value||90;
-    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);obs.winRevProc=document.getElementById('obsWinRevProc').value;
+    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);obs.winRevProc=document.getElementById('obsWinRevProc').value;obs.winRevJoin=document.getElementById('obsWinRevJoin').value;
   }
   state.obstacles.push(obs);
   renderObsList();scheduleRender();
@@ -2008,7 +2010,7 @@ function showEditBox(o){
   if(o.type==='window'){
     document.getElementById('editWinH').value=o.winH||120;
     document.getElementById('editWinSill').value=o.winSill||90;
-    document.getElementById('editWinRev').value=winRev(o);document.getElementById('editWinRevProc').value=o.winRevProc||'none';
+    document.getElementById('editWinRev').value=winRev(o);document.getElementById('editWinRevProc').value=o.winRevProc||'none';document.getElementById('editWinRevJoin').value=o.winRevJoin||'whole';
   }
   if(isW&&document.getElementById('editWallSel'))document.getElementById('editWallSel').value=o.wall||defaultWallKey();
   if(isW)document.getElementById('editWallHint').textContent='📌 嵌於'+segLabel(o.wall||defaultWallKey())+'牆厚，X 從該牆起點（左/上端）量起';
@@ -2023,7 +2025,7 @@ function applyEdit(){
   if(o.type==='window'){
     o.winH=+document.getElementById('editWinH').value||120;
     o.winSill=+document.getElementById('editWinSill').value||90;
-    o.winRev=Math.max(0,+document.getElementById('editWinRev').value||0);o.winRevProc=document.getElementById('editWinRevProc').value;
+    o.winRev=Math.max(0,+document.getElementById('editWinRev').value||0);o.winRevProc=document.getElementById('editWinRevProc').value;o.winRevJoin=document.getElementById('editWinRevJoin').value;
   }
   if(WALL_TYPES.has(o.type)){
     o.wall=document.getElementById('editWallSel').value;o.h=p.wallT;
@@ -2055,7 +2057,7 @@ function addObsFromModal(){
   if(obs.type==='window'){
     obs.winH=+document.getElementById('obsWinH').value||120;
     obs.winSill=+document.getElementById('obsWinSill').value||90;
-    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);obs.winRevProc=document.getElementById('obsWinRevProc').value;
+    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);obs.winRevProc=document.getElementById('obsWinRevProc').value;obs.winRevJoin=document.getElementById('obsWinRevJoin').value;
   }
   closeObsAddModal();
   startPlacing('obs',obs);
@@ -2386,17 +2388,46 @@ function renderStickerList(){
 const procFace=pr=>pr.face||'floor';
 function floorPiecesAll(){return floorLayout();}
 function facePiecesAny(face){return face==='floor'?floorPiecesAll():facePieces(face);}
-// 找最近的磚邊（含裁切磚）
-function edgeNear(pieces,x,y,tol){
+// 某一面的開口／排除區（門窗、浴缸、淋浴區等），快取到這一輪執行結束
+const _exclCache=new Map();
+function faceExcl(face){
+  if(_exclCache.has(face))return _exclCache.get(face);
+  if(!_exclCache.size)Promise.resolve().then(()=>_exclCache.clear());
+  const ex=face==='floor'?floorExclusions(P(),innerDim()):((faceBase(face)||{}).excl||[]);
+  _exclCache.set(face,ex);return ex;
+}
+// 一片磚實際露出的邊：磚的外框扣掉被開口蓋住的部分，再加上開口（窗、門、浴缸…）在這片磚內的邊
+// side：T／B／L／R＝這條邊在露出區域的上／下／左／右側
+function pieceEdges(pc,excl){
+  const X1=pc.x,Y1=pc.y,X2=pc.x+pc.cw,Y2=pc.y+pc.ch,E=0.5;
+  const ex=(excl||[]).filter(e=>e.x1<X2&&e.x2>X1&&e.y1<Y2&&e.y2>Y1);
+  if(!ex.length)return[{x1:X1,y1:Y1,x2:X2,y2:Y1,side:'T'},{x1:X1,y1:Y2,x2:X2,y2:Y2,side:'B'},{x1:X1,y1:Y1,x2:X1,y2:Y2,side:'L'},{x1:X2,y1:Y1,x2:X2,y2:Y2,side:'R'}];
+  const vis=(x,y)=>x>X1&&x<X2&&y>Y1&&y<Y2&&!ex.some(e=>x>e.x1&&x<e.x2&&y>e.y1&&y<e.y2);
+  const out=[],hy=new Set([Y1,Y2]),vx=new Set([X1,X2]);
+  ex.forEach(e=>{if(e.y1>Y1&&e.y1<Y2)hy.add(e.y1);if(e.y2>Y1&&e.y2<Y2)hy.add(e.y2);if(e.x1>X1&&e.x1<X2)vx.add(e.x1);if(e.x2>X1&&e.x2<X2)vx.add(e.x2);});
+  const xs=[...vx].sort((a,b)=>a-b),ys=[...hy].sort((a,b)=>a-b);
+  const run=(fixed,stops,horiz)=>{let cur=null;
+    for(let i=0;i+1<stops.length;i++){const a=stops[i],b=stops[i+1],m=(a+b)/2;
+      const s1=horiz?vis(m,fixed-E):vis(fixed-E,m),s2=horiz?vis(m,fixed+E):vis(fixed+E,m);
+      const side=s1===s2?null:(horiz?(s2?'T':'B'):(s2?'L':'R'));
+      if(side&&cur&&cur.side===side&&Math.abs((horiz?cur.x2:cur.y2)-a)<0.01){if(horiz)cur.x2=b;else cur.y2=b;continue;}
+      if(cur){out.push(cur);cur=null;}
+      if(side)cur=horiz?{x1:a,y1:fixed,x2:b,y2:fixed,side}:{x1:fixed,y1:a,x2:fixed,y2:b,side};}
+    if(cur)out.push(cur);};
+  ys.forEach(y=>run(y,xs,true));xs.forEach(x=>run(x,ys,false));
+  return out;
+}
+// 找最近的磚邊（含裁切磚、開口邊）
+function edgeNear(pieces,x,y,tol,excl){
   let best=null,bd=Infinity;
   const segD=(e)=>{const vx=e.x2-e.x1,vy=e.y2-e.y1,L=vx*vx+vy*vy||1;let t=((x-e.x1)*vx+(y-e.y1)*vy)/L;t=Math.max(0,Math.min(1,t));return Math.hypot(x-(e.x1+vx*t),y-(e.y1+vy*t));};
   for(const pc of pieces){
-    const X1=pc.x,Y1=pc.y,X2=pc.x+pc.cw,Y2=pc.y+pc.ch;
-    [{x1:X1,y1:Y1,x2:X2,y2:Y1},{x1:X1,y1:Y2,x2:X2,y2:Y2},{x1:X1,y1:Y1,x2:X1,y2:Y2},{x1:X2,y1:Y1,x2:X2,y2:Y2}].forEach(e=>{const dd=segD(e);if(dd<bd&&dd<tol){bd=dd;best=e;}});
+    if(x<pc.x-tol||x>pc.x+pc.cw+tol||y<pc.y-tol||y>pc.y+pc.ch+tol)continue;
+    pieceEdges(pc,excl).forEach(e=>{const dd=segD(e);if(dd<bd&&dd<tol){bd=dd;best={x1:e.x1,y1:e.y1,x2:e.x2,y2:e.y2};}});
   }
   return best;
 }
-function procEdgeAt(ix,iy){return edgeNear(state._tiles.map(t=>({x:t.x,y:t.y,cw:t.w,ch:t.h})),ix,iy,10/state.scale/0.28);}
+function procEdgeAt(ix,iy){return edgeNear(state._tiles.map(t=>({x:t.x,y:t.y,cw:t.w,ch:t.h})),ix,iy,10/state.scale/0.28,faceExcl('floor'));}
 function procToggle(face,e){
   const same=pr=>procFace(pr)===face&&sameEdge(pr,e);
   const had=state.procs.find(same);
@@ -2799,6 +2830,10 @@ function computeConflicts(){
         out.push({lvl:'warn',msg:`${s.label} 在「${o.label||'門'}」的開門範圍內，門可能打不開`});
     });
   });
+  // 窗側整條但超過磚長
+  {const pp=P(),dd=innerDim();wallSegs(pp,dd).forEach(seg=>{const id='seg:'+seg.key,base=faceBase(id);if(!base)return;const zs=faceZones(id,base);
+    base.excl.filter(e=>e.type==='window'&&e.rev>0&&e.revJoin!=='align').forEach(e=>{const cy=(e.y1+e.y2)/2,z=zs.find(z=>cy>=z.y0&&cy<=z.y1)||zs[0],L=Math.max(z.spec.tileW,z.spec.tileH);
+      if(Math.max(e.x2-e.x1,e.y2-e.y1)>L+0.5)out.push({lvl:'warn',msg:`${seg.tag} 牆的「${e.label||'窗'}」窗側比磚長（${L/10} cm）還長，整條排會有接縫，可改成「對壁磚縫」`});});});}
   // 窗台低於缸緣
   state.stickers.filter(s=>s.type==='bathtub'&&!s._placing).forEach(s=>{
     wallSegs(p,d).forEach(seg=>{
@@ -3901,11 +3936,27 @@ function windowReveals(){
     base.excl.filter(e=>e.type==='window'&&e.rev>0).forEach(e=>{
       const cy=(e.y1+e.y2)/2,z=zs.find(z=>cy>=z.y0&&cy<=z.y1)||zs[0];
       const w=e.x2-e.x1,h=e.y2-e.y1;
-      out.push({face:id,seg:sg,label:e.label||'窗',spec:z.spec,key:((z.spec.code&&z.spec.code!=='main')?z.spec.code:'main')+(e.revProc?'|bev':''),proc:!!e.revProc,D:e.rev,lens:[w,w,h,h]});
+      const ct=revealCuts(id,e,z.spec);
+      out.push({face:id,seg:sg,label:e.label||'窗',spec:z.spec,cuts:ct,segLens:[...cutsToLens(ct.top,w),...cutsToLens(ct.bot,w),...cutsToLens(ct.left,h),...cutsToLens(ct.right,h)],join:e.revJoin,key:((z.spec.code&&z.spec.code!=='main')?z.spec.code:'main')+(e.revProc?'|bev':''),proc:!!e.revProc,D:e.rev,lens:[w,w,h,h]});
     });
   });
   return out;
 }
+// 窗側四邊的接縫位置（mm）：上／下從左量、左／右從上量
+// 整條：每段最長一片磚長；對壁磚縫：跟著窗洞外側那一排／列壁磚的縫斷開
+function revealCuts(face,e,spec){
+  const L=Math.max(spec.tileW,spec.tileH),g=spec.grout||0,w=e.x2-e.x1,h=e.y2-e.y1;
+  const whole=len=>{const o=[];for(let t=L;t<len-1;t+=L+g)o.push(t);return o;};
+  const cap=(pos,len)=>{const o=[];let prev=0;pos.concat([len]).forEach(t=>{while(t-prev>L+g+0.5){prev+=L+g;o.push(prev);}if(t<len-1)o.push(t);prev=t;});return o;};
+  if(e.revJoin!=='align')return{top:whole(w),bot:whole(w),left:whole(h).map(t=>h-t).reverse(),right:whole(h).map(t=>h-t).reverse()};
+  const pcs=facePieces(face);
+  // 取窗洞外側緊鄰的那一排（列）壁磚（窗邊剛好落在磚縫時也找得到）
+  const B=g+3;
+  const xsAt=(lo,hi)=>[...new Set(pcs.filter(pc=>pc.y<hi&&pc.y+pc.ch>lo&&pc.x>e.x1+1&&pc.x<e.x2-1).map(pc=>Math.round(pc.x-g/2-e.x1)))].sort((a,b)=>a-b);
+  const ysAt=(lo,hi)=>[...new Set(pcs.filter(pc=>pc.x<hi&&pc.x+pc.cw>lo&&pc.y>e.y1+1&&pc.y<e.y2-1).map(pc=>Math.round(pc.y-g/2-e.y1)))].sort((a,b)=>a-b);
+  return{top:cap(xsAt(e.y1-B,e.y1),w),bot:cap(xsAt(e.y2,e.y2+B),w),left:cap(ysAt(e.x1-B,e.x1),h),right:cap(ysAt(e.x2,e.x2+B),h)};
+}
+const cutsToLens=(cuts,len)=>{const o=[];let p=0;cuts.concat([len]).forEach(t=>{if(t-p>0.5)o.push(t-p);p=t;});return o;};
 // 依磚種估算收邊用磚：磚沿長邊裁成 D 寬的長條，一片可裁 floor(短邊/D) 條；各邊長度依序排入長條（餘料可接用）
 function revealStats(){
   const G={};
@@ -3913,7 +3964,7 @@ function revealStats(){
     const g=G[r.key]||(G[r.key]={spec:r.spec,wins:[],segs:[],D:0});
     g.wins.push(r);
     const L=Math.max(r.spec.tileW,r.spec.tileH);
-    r.lens.forEach(len=>{let x=len;while(x>L+0.5){g.segs.push({len:L,D:r.D});x-=L;}if(x>0.5)g.segs.push({len:x,D:r.D});});
+    r.segLens.forEach(len=>g.segs.push({len:Math.min(len,L),D:r.D}));
   });
   Object.values(G).forEach(g=>{
     const L=Math.max(g.spec.tileW,g.spec.tileH),S=Math.min(g.spec.tileW,g.spec.tileH);
@@ -4028,7 +4079,7 @@ function wallObsExclusions(wallKey, surfW, wallHmm){
         fY2=wallHmm-sillMm;
         fY1=fY2-winHmm;
       }
-      return{x1:Math.max(0,fX),y1:Math.max(0,fY1),x2:Math.min(surfW,fX+fW),y2:Math.min(wallHmm,fY2),type:o.type,label:o.label,rev:o.type==='window'?winRev(o)*10:0,revProc:o.type==='window'&&o.winRevProc==='bevel',hingeL:((o.swing||'left')==='left')!==flip};
+      return{x1:Math.max(0,fX),y1:Math.max(0,fY1),x2:Math.min(surfW,fX+fW),y2:Math.min(wallHmm,fY2),type:o.type,label:o.label,rev:o.type==='window'?winRev(o)*10:0,revProc:o.type==='window'&&o.winRevProc==='bevel',revJoin:o.winRevJoin||'whole',id:o.id,hingeL:((o.swing||'left')==='left')!==flip};
     }));
 }
 
@@ -5176,7 +5227,7 @@ function addWallThickness3D(root,sm,p,H){
   });
 }
 // ---- 3D：窗洞收邊（窗框內退，四周側面貼磚，窗在內退處）----
-function revealStripTex(lenmm,Dmm,vertical,spec){
+function revealStripTex(lenmm,Dmm,vertical,spec,cuts){
   const w=vertical?Dmm:lenmm,h=vertical?lenmm:Dmm;
   return offscreenSurface(w,h,s=>{
     ctx.fillStyle=spec&&spec.color?spec.color:tileFill(true);ctx.fillRect(0,0,w*s,h*s);
@@ -5184,7 +5235,7 @@ function revealStripTex(lenmm,Dmm,vertical,spec){
     const L=Math.max(spec.tileW,spec.tileH),g=spec.grout||0;
     ctx.strokeStyle='#A8A296';ctx.lineWidth=Math.max(1,g*s,1.5);
     ctx.strokeRect(0,0,w*s,h*s);
-    for(let t=L;t<lenmm-1;t+=L+g){ctx.beginPath();if(vertical){ctx.moveTo(0,(lenmm-t)*s);ctx.lineTo(w*s,(lenmm-t)*s);}else{ctx.moveTo(t*s,0);ctx.lineTo(t*s,h*s);}ctx.stroke();}
+    (cuts||[]).forEach(t=>{ctx.beginPath();if(vertical){ctx.moveTo(0,t*s);ctx.lineTo(w*s,t*s);}else{ctx.moveTo(t*s,0);ctx.lineTo(t*s,h*s);}ctx.stroke();});
   });
 }
 function addWindowReveals3D(mesh,seg,ex,H){
@@ -5194,12 +5245,13 @@ function addWindowReveals3D(mesh,seg,ex,H){
     const wmm=e.x2-e.x1,hmm=e.y2-e.y1,D=e.rev/10,w=wmm/10,h=hmm/10;
     const X1=e.x1/10,X2=e.x2/10,Yt=H-e.y1/10,Yb=H-e.y2/10;
     const mk=(geo,cv,pos)=>{const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:texFrom(cv),side:THREE.DoubleSide}));m.position.set(...pos);m.add(edgeLines(geo,0x6E6A62,0.9));mesh.add(m);};
+    const ct=revealCuts(id,e,spec);
     // 上（窗楣）、下（窗台）：寬 w、深 D
-    const top=new THREE.PlaneGeometry(w,D);top.rotateX(Math.PI/2);mk(top,revealStripTex(wmm,e.rev,false,spec),[X1+w/2,Yt,-D/2]);
-    const bot=new THREE.PlaneGeometry(w,D);bot.rotateX(-Math.PI/2);mk(bot,revealStripTex(wmm,e.rev,false,spec),[X1+w/2,Yb,-D/2]);
+    const top=new THREE.PlaneGeometry(w,D);top.rotateX(Math.PI/2);mk(top,revealStripTex(wmm,e.rev,false,spec,ct.top),[X1+w/2,Yt,-D/2]);
+    const bot=new THREE.PlaneGeometry(w,D);bot.rotateX(-Math.PI/2);mk(bot,revealStripTex(wmm,e.rev,false,spec,ct.bot),[X1+w/2,Yb,-D/2]);
     // 左右側：深 D、高 h
-    const l=new THREE.PlaneGeometry(D,h);l.rotateY(Math.PI/2);mk(l,revealStripTex(hmm,e.rev,true,spec),[X1,Yb+h/2,-D/2]);
-    const r=new THREE.PlaneGeometry(D,h);r.rotateY(-Math.PI/2);mk(r,revealStripTex(hmm,e.rev,true,spec),[X2,Yb+h/2,-D/2]);
+    const l=new THREE.PlaneGeometry(D,h);l.rotateY(Math.PI/2);mk(l,revealStripTex(hmm,e.rev,true,spec,ct.left),[X1,Yb+h/2,-D/2]);
+    const r=new THREE.PlaneGeometry(D,h);r.rotateY(-Math.PI/2);mk(r,revealStripTex(hmm,e.rev,true,spec,ct.right),[X2,Yb+h/2,-D/2]);
     // 窗：在內退深度處
     const wcv=offscreenSurface(wmm,hmm,s=>{drawWindowElev(0,0,wmm*s,hmm*s,s);});
     const wg=new THREE.PlaneGeometry(w,h);mk(wg,wcv,[X1+w/2,Yb+h/2,-D]);
@@ -5268,7 +5320,7 @@ function proc3DAt(e){
   {const pt=floorHit(e);if(pt){const d=innerDim(),x=pt.x*10,y=pt.z*10;if(x>=0&&y>=0&&x<=d.iw*10&&y<=d.ih*10)cands.push({dist:V3.camera.position.distanceTo(pt),face:'floor',x,y});}}
   cands.sort((a,b)=>a.dist-b.dist);const c=cands[0];if(!c)return null;
   const tol=Math.max(20,c.dist*10*0.02);
-  const ed=edgeNear(facePiecesAny(c.face),c.x,c.y,tol);
+  const ed=edgeNear(facePiecesAny(c.face),c.x,c.y,tol,faceExcl(c.face));
   return ed?{face:c.face,e:ed}:null;
 }
 // 面內 mm → 3D 世界座標
@@ -5794,8 +5846,7 @@ function importJSON(e){
 // ---- 統計：磚尺寸圖示＋加工磚區分 ----
 // 某一片磚的哪些邊被標了加工（回傳種類 Set）
 function pieceProcTypes(face,pc){
-  const ts=new Set(),X1=pc.x,Y1=pc.y,X2=pc.x+pc.cw,Y2=pc.y+pc.ch;
-  const es=[{x1:X1,y1:Y1,x2:X2,y2:Y1},{x1:X1,y1:Y2,x2:X2,y2:Y2},{x1:X1,y1:Y1,x2:X1,y2:Y2},{x1:X2,y1:Y1,x2:X2,y2:Y2}];
+  const ts=new Set(),es=pieceEdges(pc,faceExcl(face));
   (state.procs||[]).forEach(pr=>{if(procFace(pr)!==face)return;
     const a={x1:Math.min(pr.x1,pr.x2),y1:Math.min(pr.y1,pr.y2),x2:Math.max(pr.x1,pr.x2),y2:Math.max(pr.y1,pr.y2)};
     if(es.some(e=>sameEdge(a,e)))ts.add(pr.type);});
@@ -5810,13 +5861,11 @@ function procStatsFor(items){
 // ---- 背斜加工：依手動「工廠背斜切」標記分類、合併，算出要給工廠加工的磚 ----
 const BEV='工廠背斜切',BEV_GAP=10,BEV_LOSS=5; // 合併：兩片寬度相加＋1cm 要「小於」整磚寬；單片背斜損耗約 5mm
 function pieceBevelEdges(face,pc){
-  const X1=pc.x,Y1=pc.y,X2=pc.x+pc.cw,Y2=pc.y+pc.ch;
-  const es={T:{x1:X1,y1:Y1,x2:X2,y2:Y1},B:{x1:X1,y1:Y2,x2:X2,y2:Y2},L:{x1:X1,y1:Y1,x2:X1,y2:Y2},R:{x1:X2,y1:Y1,x2:X2,y2:Y2}};
-  const out=new Set();
+  const es=pieceEdges(pc,faceExcl(face)),out=[];
   (state.procs||[]).forEach(pr=>{if(pr.type!==BEV||procFace(pr)!==face)return;
     const a={x1:Math.min(pr.x1,pr.x2),y1:Math.min(pr.y1,pr.y2),x2:Math.max(pr.x1,pr.x2),y2:Math.max(pr.y1,pr.y2)};
-    Object.entries(es).forEach(([k,e])=>{if(sameEdge(a,e))out.add(k);});});
-  return[...out];
+    es.forEach(e=>{if(sameEdge(a,e)&&!out.some(o=>sameEdge(o,e)))out.push(e);});});
+  return out;
 }
 // items：同一種磚的 [{face,pc}]；回傳 {used:Set(背斜片), cats:{'長單邊背斜':磚數…}, rems:[剩料], tiles}
 function bevelPlan(items,spec){
@@ -5825,10 +5874,12 @@ function bevelPlan(items,spec){
   const used=new Set(),cats={},rems=[],singles=[],list=[];
   const add=(k,members,rem)=>{cats[k]=(cats[k]||0)+1;list.push({cat:k,members,rem:rem||null});if(rem)rems.push(rem);};
   (items||[]).forEach(({face,pc})=>{
-    const es=pieceBevelEdges(face,pc);if(!es.length)return;used.add(pc);
-    const hs=es.filter(e=>e==='T'||e==='B'),vs=es.filter(e=>e==='L'||e==='R');
+    const be=pieceBevelEdges(face,pc);if(!be.length)return;used.add(pc);
+    const es=be.map(e=>e.side),hs=es.filter(e=>e==='T'||e==='B'),vs=es.filter(e=>e==='L'||e==='R');
     if(es.length===1){
-      const e=es[0],h=e==='T'||e==='B',wd=h?pc.ch:pc.cw,full=h?tH:tW;
+      const e=es[0],g=be[0],h=e==='T'||e==='B',full=h?tH:tW;
+      // 寬度＝這條邊到磚另一側的距離（開口邊也適用）
+      const wd=e==='T'?pc.y+pc.ch-g.y1:e==='B'?g.y1-pc.y:e==='L'?pc.x+pc.cw-g.x1:g.x1-pc.x;
       if(!pc.isPartial||wd>=full-0.5){add(cls(e)+'單邊背斜',[pc]);return;}
       singles.push({cls:cls(e),h,wd,full,pc});
     } else if(es.length===2&&(hs.length===2||vs.length===2))add(cls(es[0])+'雙邊背斜',[pc]);
