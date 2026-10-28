@@ -82,6 +82,8 @@ input:focus,select:focus{border-color:var(--accent)}
 canvas{display:block}
 .li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
 .ls{width:13px;height:13px;border-radius:2px;border:1px solid rgba(0,0,0,.1)}
+.tile-legend{position:absolute;left:12px;top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:calc(100% - 260px);padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.82);border:1px solid var(--border);pointer-events:none}.tile-legend:empty{display:none}.tile-legend .note{font-size:10px;color:var(--faint,#9AA)}.tile-legend .li{white-space:nowrap}
+.lsw{width:14px;height:14px;border-radius:2px;border:1px solid rgba(0,0,0,.18);flex:none}
 .mode-btn{font-size:11px;padding:4px 10px;border-radius:var(--r);border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);transition:all .15s;font-family:var(--sans)}
 .mode-btn:hover{background:var(--surface2)}
 .mode-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -812,8 +814,6 @@ canvas{display:block}
       <button class="btn btn-sm" onclick="resetZoom()">符合</button>
     </div>
     <div style="display:flex;gap:12px;margin-left:auto;align-items:center">
-      <div class="li" id="fullLegend"><div class="ls" style="background:#E3E1DB"></div>整磚</div>
-      <div class="li" id="cutLegend"><div class="ls" style="background:#D1CCB9"></div>裁切</div>
       <span id="tubMsg" style="display:none;align-items:center;padding:3px 8px;border-radius:4px;background:#FDECEA;color:#B3261E;font-size:12px">浴缸必須在室內，已移回</span>
       <div class="disp-menu">
         <button class="btn btn-sm" id="cfBtn" style="display:none;background:#FFF4E5;border-color:#E8B37A;color:#8A4B0F" onclick="event.stopPropagation();document.getElementById('cfPop').classList.toggle('open')"></button>
@@ -859,6 +859,7 @@ canvas{display:block}
     <span id="ftInfo" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></span>
     <button class="btn btn-sm" onclick="openZed(state.orgSel.split('#')[0])">分區編輯</button>
   </div>
+  <div style="position:relative;height:0;z-index:6"><div id="tileLegend" class="tile-legend"></div></div>
   <div class="canvas-wrap" id="canvasWrap">
     <canvas id="fc"></canvas>
     <div id="view3d" style="display:none;position:absolute;inset:0"></div>
@@ -936,12 +937,31 @@ function renderSwatches(){
 function setMainColor(k,c){state.tileColors=state.tileColors||{};state.tileColors[k]=c;renderSwatches();refreshTileSummary();updateLegend();scheduleRender();if(typeof zedOpen==='function'&&zedOpen())zedChanged(true);}
 function setMainColor_floor(c){setMainColor('floor',c);}function setMainColor_wall(c){setMainColor('wall',c);}
 function setTtColor(c){const t=ttList(_ttEdit).find(t=>t.code===_ttEdit);if(!t)return;t.color=c;renderSwatches();ttApply();}
-function updateLegend(){const k=state.view==='wall'?'wall':'floor',c=mainColor(k);
-  const a=document.querySelector('#fullLegend .ls'),b=document.querySelector('#cutLegend .ls');if(a)a.style.background=c;if(b)b.style.background=shadeHex(c,CUT_SHADE);}
+// 圖例：列出目前畫面上用到的磚種（左上＝整磚、右下＝裁切）
+function legendSpecs(){
+  const out=[],add=sp=>{if(sp&&sp.color&&!out.some(o=>o.name===sp.name&&o.color===sp.color))out.push({name:sp.name,color:sp.color,strip:!!sp.strip});};
+  const v=state.view;if(!state.spaceDone)return out;
+  if(v==='floor'||v==='unfold'){const FA=floorAll();
+    if(FA.G&&FA.G.main&&FA.G.main.items&&FA.G.main.items.length)add(floorMainSpec());
+    (FA.zl||[]).forEach(r=>{if(r.strip)add({...r.spec,strip:true});else if((FA.zp||[]).some(pc=>pc.zone===r.z.id))add(r.spec);});}
+  if(v==='wall'||v==='unfold'){
+    const ids=v==='wall'?(state._wHits||[]).filter(h=>h.kind==='seg').map(h=>'seg:'+h.seg.key):wallSegs(P(),innerDim()).map(sg=>'seg:'+sg.key);
+    ids.forEach(id=>facePieces(id).forEach(pc=>add(pc.spec&&pc.spec.code==='main'&&!pc.spec.color?{...pc.spec,color:mainColor('wall')}:{...pc.spec,name:pc.spec.code==='main'?tileName('wall'):pc.spec.name})));
+    if(v==='unfold')tubFaces().forEach(f=>add({...f.spec,name:f.spec.key==='floor'?tileName('floor'):tileName('wall')}));}
+  return out;
+}
+let _legSig='';
+function updateLegend(){
+  const el=document.getElementById('tileLegend');if(!el)return;
+  let L=[];try{L=legendSpecs();}catch(e){L=[];}
+  const sig=JSON.stringify(L)+(state.showCut!==false);if(sig===_legSig)return;_legSig=sig;
+  const cut=state.showCut!==false;
+  el.innerHTML=(L.length?`<span class="note">${cut?'左上整磚・右下裁切':'磚種'}</span>`:'')+L.map(t=>`<span class="li"><span class="lsw" style="background:${t.strip||!cut?t.color:`linear-gradient(135deg,${t.color} 0 50%,${shadeHex(t.color,CUT_SHADE)} 50% 100%)`}"></span>${escH(t.name)}</span>`).join('');
+}
 function toggleShowDims(on){state.showDims=on;scheduleRender();}
 document.addEventListener('click',()=>{['dispPop','cfPop'].forEach(id=>{const p=document.getElementById(id);if(p)p.classList.remove('open');});});
 function toggleShowNum(on){state.showNum=on;scheduleRender();}
-function toggleShowCut(on){state.showCut=on;const l=document.getElementById('cutLegend');if(l)l.style.opacity=on?1:0.35;scheduleRender();}
+function toggleShowCut(on){state.showCut=on;scheduleRender();}
 const DECOR_TYPES=new Set(['toilet','bathroomCab','mirrorCab','freeTub']);
 function isDecor(s){return DECOR_TYPES.has(s.type);}
 function stkShown(s){if(isDecor(s)&&state.mode==='origin'&&(state.view==='floor'||state.view==='wall'))return false;return !isDecor(s)||state.showDecor!==false||s._placing;}
@@ -1462,6 +1482,7 @@ function setView(v){
   if(wallCtrl)wallCtrl.style.display=isWall?'flex':'none';
   const v3c=document.getElementById('v3dCtrl');
   if(v3c)v3c.style.display=v==='unfold'?'flex':'none';
+  if(v!=='unfold'&&typeof V3!=='undefined'&&V3.pairObj)clearPair();
   {const zc=document.getElementById('zoomCtrl');if(zc)zc.style.display=v==='unfold'?'none':'';}
   if(v!=='unfold'){
     document.getElementById('view3d').style.display='none';
@@ -2027,7 +2048,7 @@ function setMode(m){
    const hp=document.getElementById('v3dHelp');if(hp)hp.style.display=m==='proc'?'none':'';
    if(m!=='proc'){const ph=document.getElementById('placeHint');if(ph&&!(typeof V3!=='undefined'&&V3.placing))ph.style.display='none';}
    if(typeof V3!=='undefined'&&V3.procObj){V3.procObj.visible=false;if(V3.renderer)draw3D();}}
-  state.snapHover=null;state.procHover=null;if(typeof scheduleRender==='function')scheduleRender();
+  state.snapHover=null;state.procHover=null;if(typeof V3!=='undefined'&&V3.pairObj)clearPair();if(typeof scheduleRender==='function')scheduleRender();
 }
 
 function snapOrigin(pos){
@@ -3000,8 +3021,8 @@ function updateConflicts(){
   document.getElementById('cfList').innerHTML=list.map(c=>`<div style="padding:5px 2px;border-bottom:1px solid var(--border);font-size:12px;color:${c.lvl==='err'?'#B3261E':'#8A4B0F'};white-space:normal">• ${c.msg}</div>`).join('');
 }
 function render(){
-  state._orgMarks=null;
-  try{updateLegend();}catch(e){}
+  state._orgMarks=null;if(typeof V3!=='undefined'){V3._pairIdx=null;if(V3.pairObj&&V3.pairObj.visible&&V3._pairKey){const k=V3.pairLock||V3._pairKey,l=V3._pairLb;setTimeout(()=>{try{if(V3.pairObj&&V3.pairObj.visible)showPair(k,l);}catch(e){}},0);}}
+  setTimeout(()=>{try{updateLegend();}catch(e){}},0);
   // 有分切線的面先補齊各區 area（之後的排磚與起鋪點都以區為單位）
   try{if(state.spaceDone)Object.keys(state.splits||{}).forEach(id=>{const sp=state.splits[id];if(sp&&(sp.lines||[]).length&&(id==='floor'||(id.startsWith('seg:')&&getSeg(id.slice(4)))))faceIsSplit(id);});}catch(e){}
   histSchedule();refreshTileSummary();enforceTubInside();updateConflicts();
@@ -5044,6 +5065,7 @@ function init3D(){
       if(!!r!==!!o||(r&&o&&(r.face!==o.face||!sameEdge(r.e,o.e)))){V3._procHov=r;show3DProcHover(r);if(!r){const h=document.getElementById('placeHint');if(h&&!V3.placing)h.style.display='none';}draw3D();}
       el.style.cursor=r?'pointer':'grab';return;
     }
+    if(state.mode!=='proc'&&!V3.ptrs.size&&!V3.drag&&!V3.placing){pairHover(e);return;}
     const pt=V3.ptrs.get(e.pointerId);if(!pt)return;
     const dx=e.clientX-pt.x,dy=e.clientY-pt.y;
     if(V3.ptrs.size>=2){
@@ -5079,11 +5101,13 @@ function init3D(){
       const r=proc3DAt(e);if(r){procToggle(r.face,r.e);V3._procHov=null;show3DProcHover(null);const h=document.getElementById('placeHint');if(h)h.style.display='none';}return;
     }
     if(pt&&!pt.pan&&e.type==='pointerup'&&Math.hypot(e.clientX-pt.sx,e.clientY-pt.sy)<4&&!V3.placing){
+      if(state.mode!=='proc'){const it=pairAt(e),k=it?it.key:null;
+        if(k&&k!==V3.pairLock){V3.pairLock=k;showPair(k,it.lb);}else{V3.pairLock=null;V3._pairKey=k;V3._pairLb=it?it.lb:null;showPair(k,it?it.lb:null);}draw3D();}
       if(state.obstacles.some(o=>o.selected)||state.stickers.some(s=>s.selected))deselectAll3D();
     }
   };
   el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
-  el.addEventListener('pointerleave',()=>{if(V3.placing&&!V3.ptrs.size){const it=findItem(V3.placing.kind,V3.placing.id);const rec=it&&V3.items.get(V3.placing.kind+':'+it.id);if(rec){rec.obj.visible=false;it._seen=false;draw3D();}}});
+  el.addEventListener('pointerleave',()=>{if(!V3.pairLock&&V3._pairKey&&state.mode!=='proc'){clearPair();draw3D();}if(V3.placing&&!V3.ptrs.size){const it=findItem(V3.placing.kind,V3.placing.id);const rec=it&&V3.items.get(V3.placing.kind+':'+it.id);if(rec){rec.obj.visible=false;it._seen=false;draw3D();}}});
   el.addEventListener('dblclick',e=>{
     setRay(e);V3.scene.updateMatrixWorld();
     const sps=V3.walls.filter(w=>w.sp&&w.sp.visible&&worldVisible(w.sp)).map(w=>w.sp);
@@ -5741,7 +5765,7 @@ function wallHit(e){
   return{key:w.key,lx:lp.x,ly:lp.y};
 }
 // 3D 加工標記：射線打到的面（牆／柱面／管道間面、浴缸半牆與檯面、地板），回傳面內 mm 座標
-function proc3DAt(e){
+function proc3DAt(e,raw){
   setRay(e);V3.scene.updateMatrixWorld();
   const p=P(),H=p.wallH,cands=[];
   {const ms=V3.walls.filter(w=>w.mesh.visible).map(w=>w.mesh),h=_ray.intersectObjects(ms,false)[0];
@@ -5763,7 +5787,7 @@ function proc3DAt(e){
   {const rv=(V3.revMeshes||[]).filter(r=>worldVisible(r.m)),h=_ray.intersectObjects(rv.map(r=>r.m),false)[0];
    if(h){const it=rv.find(r=>r.m===h.object),ri=revInfo(it.face);if(ri){const lp=it.wall.worldToLocal(h.point.clone()),c=revFromWall(ri,lp.x*10,(H-lp.y)*10,-lp.z*10);
      cands.push({dist:h.distance-0.01,face:it.face,x:c.x,y:c.y,small:true});}}}
-  cands.sort((a,b)=>a.dist-b.dist);const c=cands[0];if(!c)return null;
+  cands.sort((a,b)=>a.dist-b.dist);const c=cands[0];if(!c)return null;if(raw)return c;
   const tol=c.small?Math.max(8,Math.min(30,c.dist*10*0.012)):Math.max(20,c.dist*10*0.02);
   const ed=edgeNear(facePiecesAny(c.face),c.x,c.y,tol,faceExcl(c.face));
   return ed?{face:c.face,e:ed}:null;
@@ -5784,6 +5808,45 @@ function faceToWorld(face,x,y,lift){
   return b==='e'?new THREE.Vector3(cx+W/2+O,yy,cz+D/2-x/10):b==='w'?new THREE.Vector3(cx-W/2-O,yy,cz-D/2+x/10)
         :b==='s'?new THREE.Vector3(cx-W/2+x/10,yy,cz+D/2+O):new THREE.Vector3(cx+W/2-x/10,yy,cz-D/2-O);
 }
+// ---- 3D 裁切磚配對：滑鼠移到裁切磚，標出同一片整磚裁出來的其他片 ----
+function pairIndex(){
+  if(V3._pairIdx)return V3._pairIdx;
+  const list=[];
+  const FA=floorAll();FA.all.forEach(pc=>{const lb=FA.map.get(pc);if(lb)list.push({face:'floor',pc,lb,dom:'F'});});
+  const WN=wallNumbering();Object.entries(WN).forEach(([id,arr])=>{facePieces(id).forEach((pc,i)=>{const lb=arr[i];if(lb)list.push({face:id,pc,lb,dom:'W'});});});
+  list.forEach(it=>{const m=/^(.*?\d+)([a-z]+)$/.exec(it.lb);it.key=m?it.dom+'|'+m[1]:null;it.base=m?m[1]:it.lb;});
+  return V3._pairIdx=list;
+}
+function pairFaceName(id){const[k,a,b]=id.split(':');if(id==='floor')return'地面';if(k==='seg'){const sg=getSeg(a);return'牆'+(sg?sg.tag:a);}return b==='deck'?'浴缸檯面':'半牆'+(TUB_EDGE_LBL[b]||'');}
+function pairAt(e){
+  const c=proc3DAt(e,true);if(!c||String(c.face).startsWith('rev:'))return null;
+  const it=pairIndex().find(t=>t.face===c.face&&c.x>=t.pc.x&&c.x<=t.pc.x+t.pc.cw&&c.y>=t.pc.y&&c.y<=t.pc.y+t.pc.ch);
+  return it&&it.key?it:null;
+}
+function showPair(key,hovLb){
+  if(!V3.pairObj){V3.pairObj=new THREE.Group();V3.scene.add(V3.pairObj);}
+  const g=V3.pairObj;while(g.children.length){const c=g.children.pop();c.geometry&&c.geometry.dispose();c.material&&c.material.dispose();}
+  const hint=document.getElementById('placeHint');
+  if(!key){g.visible=false;if(hint&&!V3.placing&&state.mode!=='proc')hint.style.display='none';return;}
+  const its=pairIndex().filter(t=>t.key===key).sort((a,b)=>a.lb.localeCompare(b.lb));
+  const rad=Math.max(0.05,Math.min(1.4,V3.radius*0.003));
+  its.forEach(t=>{const pc=t.pc,cs=[[pc.x,pc.y],[pc.x+pc.cw,pc.y],[pc.x+pc.cw,pc.y+pc.ch],[pc.x,pc.y+pc.ch]].map(([x,y])=>faceToWorld(t.face,x,y,0.7));
+    if(cs.some(v=>!v))return;const main=t.lb===hovLb;
+    const geo=new THREE.BufferGeometry().setFromPoints([cs[0],cs[1],cs[2],cs[0],cs[2],cs[3]]);
+    const fill=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0xF07020,transparent:true,opacity:main?0.38:0.28,side:THREE.DoubleSide,depthWrite:false}));fill.renderOrder=25;g.add(fill);
+    for(let i=0;i<4;i++){const a=cs[i],b=cs[(i+1)%4],len=a.distanceTo(b);if(len<0.01)continue;
+      const m=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,6),new THREE.MeshBasicMaterial({color:0xE05A10,transparent:true,opacity:0.95,depthTest:false}));
+      m.position.copy(a.clone().add(b).multiplyScalar(0.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize());m.renderOrder=31;g.add(m);}});
+  g.visible=true;
+  if(hint){hint.style.display='inline-flex';hint.style.background='#C2560F';
+    hint.textContent=`${its[0]?its[0].base:''}：1 片整磚裁成 `+its.map(t=>`${t.lb}（${pairFaceName(t.face)}）`).join('、')+(V3.pairLock===key?'　🔒 點空白處取消':'');}
+}
+function pairHover(e){
+  if(V3.pairLock)return;
+  const it=pairAt(e),k=it?it.key:null,lb=it?it.lb:null;
+  if(k===V3._pairKey&&lb===V3._pairLb)return;V3._pairKey=k;V3._pairLb=lb;showPair(k,lb);draw3D();
+}
+function clearPair(){V3.pairLock=null;V3._pairKey=null;V3._pairLb=null;if(V3.pairObj){showPair(null);}}
 function show3DProcHover(r){
   if(!V3.procObj){V3.procObj=new THREE.Group();V3.scene.add(V3.procObj);}
   const g=V3.procObj;while(g.children.length){const c=g.children.pop();c.geometry&&c.geometry.dispose();c.material&&c.material.dispose();}
@@ -5794,7 +5857,7 @@ function show3DProcHover(r){
   m.position.copy(a.clone().add(b).multiplyScalar(0.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize());m.renderOrder=30;
   g.add(m);g.visible=true;
   const hint=document.getElementById('placeHint');
-  if(hint){hint.style.display='inline-flex';hint.textContent=(st.cancel?'點擊取消：':st.had?'點擊改為：':'點擊標記：')+state.procType+`（${Math.round(Math.hypot(r.e.x2-r.e.x1,r.e.y2-r.e.y1))/10} cm）`;}
+  if(hint){hint.style.display='inline-flex';hint.style.background='#2F7BD8';hint.textContent=(st.cancel?'點擊取消：':st.had?'點擊改為：':'點擊標記：')+state.procType+`（${Math.round(Math.hypot(r.e.x2-r.e.x1,r.e.y2-r.e.y1))/10} cm）`;}
 }
 function worldVisible(o){while(o){if(!o.visible)return false;o=o.parent;}return true;}
 function pickHit(e){
