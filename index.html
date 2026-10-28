@@ -794,7 +794,7 @@ canvas{display:block}
       <button class="btn btn-sm" onclick="resetZoom()">符合</button>
     </div>
     <div style="display:flex;gap:12px;margin-left:auto;align-items:center">
-      <div class="li" id="fullLegend"><div class="ls" style="background:#E8E3CD"></div>整磚</div>
+      <div class="li" id="fullLegend"><div class="ls" style="background:#F3EED8"></div>整磚</div>
       <div class="li" id="cutLegend"><div class="ls" style="background:#D1CCB9"></div>裁切</div>
       <span id="tubMsg" style="display:none;align-items:center;padding:3px 8px;border-radius:4px;background:#FDECEA;color:#B3261E;font-size:12px">浴缸必須在室內，已移回</span>
       <div class="disp-menu">
@@ -894,12 +894,12 @@ const STICKER_DEFAULTS={
 
 let renderTimer=null;
 // 磚面顏色：可切換是否標示裁切磚
-// 磚色：12 色可選；整磚＝標準色，裁切磚＝加深 10%
-const TILE_PALETTE=[['#E8E3CD','米白'],['#E4D0B7','奶茶'],['#CBB095','駝色'],['#B4A296','灰褐'],['#D7B8B6','豆沙粉'],['#C1A3A1','玫瑰灰'],['#C0C2AC','灰綠'],['#A1B8A6','鼠尾草'],['#CDD9CF','薄荷'],['#B2C6C4','青灰'],['#BDC7D3','霧藍'],['#D6D5D1','淺灰']];
-const CUT_SHADE=0.9;
-function shadeHex(h,f){h=String(h||'#E8E3CD').replace('#','');if(h.length===3)h=h.replace(/./g,'$&$&');const n=parseInt(h,16);
+// 磚色：12 色可選；整磚＝標準色，裁切磚＝加深 5%
+const TILE_PALETTE=[['#F3EED8','米白'],['#F2DCC0','奶茶'],['#DDBB9A','駝色'],['#C5AC9C','灰褐'],['#E6C1BE','豆沙粉'],['#D2AAA7','玫瑰灰'],['#CFD1B4','灰綠'],['#A8C8AF','鼠尾草'],['#D7E6DA','薄荷'],['#BAD5D2','青灰'],['#C6D2E1','霧藍'],['#E3E1DB','淺灰']];
+const CUT_SHADE=0.95;
+function shadeHex(h,f){h=String(h||'#F3EED8').replace('#','');if(h.length===3)h=h.replace(/./g,'$&$&');const n=parseInt(h,16);
   const c=v=>Math.max(0,Math.min(255,Math.round(v*f))).toString(16).padStart(2,'0');return'#'+c(n>>16&255)+c(n>>8&255)+c(n&255);}
-function mainColor(k){const c=((typeof state!=='undefined'&&state.tileColors)||{})[k];return c||(k==='wall'?'#B2C6C4':TILE_PALETTE[0][0]);}
+function mainColor(k){const c=((typeof state!=='undefined'&&state.tileColors)||{})[k];return c||(k==='wall'?'#BAD5D2':TILE_PALETTE[0][0]);}
 function tileFill(isPartial,color){const c=color||mainColor('floor');return isPartial&&state.showCut!==false?shadeHex(c,CUT_SHADE):c;}
 function labelCol(isPartial,color){return isPartial&&state.showCut!==false?shadeHex(color||mainColor('floor'),0.42):'#73777A';}
 // 最接近的調色盤顏色（舊檔自訂色轉換用）
@@ -6237,7 +6237,7 @@ function bevelIconSvg(wmm,hmm,cat){
 const ICON_K=0.045; // 圖示比例：每 mm 0.045px（120cm＝54px），所有磚同比例
 function tileIconSvg(wmm,hmm,procType,color){
   const k=Math.min(ICON_K,90/Math.max(wmm,hmm)),w=Math.max(10,wmm*k),h=Math.max(10,hmm*k),col=procType?PROC_COLORS[procType]:null;
-  return `<svg width="${w+8}" height="${h+8}" viewBox="0 0 ${w+8} ${h+8}" style="flex:none"><rect x="4" y="4" width="${w}" height="${h}" fill="${color||(col?'#F7F1E4':'#E8E3CD')}" stroke="#8A8780" stroke-width="1"/>`+
+  return `<svg width="${w+8}" height="${h+8}" viewBox="0 0 ${w+8} ${h+8}" style="flex:none"><rect x="4" y="4" width="${w}" height="${h}" fill="${color||(col?'#F7F1E4':'#F3EED8')}" stroke="#8A8780" stroke-width="1"/>`+
     (col?`<line x1="4" y1="4" x2="${w+4}" y2="4" stroke="${col}" stroke-width="4" stroke-linecap="round"/>`:'')+`</svg>`;
 }
 // 一欄的「磚尺寸＋一般／加工」預覽
