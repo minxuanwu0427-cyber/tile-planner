@@ -577,6 +577,46 @@ canvas{display:block}
   </div>
 </div>
 
+<!-- 淋浴區（濕區）設定 Modal -->
+<div class="modal-overlay hidden" id="wetModal" onclick="if(event.target===this)closeWetModal()">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title">淋浴區（濕區）設定　<span id="wetType" style="font-size:12px;color:var(--muted);font-weight:400"></span></div>
+    <div class="wet-h">範圍（室內，從左上角量起）</div>
+    <div class="row">
+      <div class="field"><label>距左 (cm)</label><input type="number" id="wetX" step="0.5" min="0" oninput="wetApply()"></div>
+      <div class="field"><label>距上 (cm)</label><input type="number" id="wetY" step="0.5" min="0" oninput="wetApply()"></div>
+      <div class="field"><label>寬 (cm)</label><input type="number" id="wetW" step="0.5" min="20" oninput="wetApply()"></div>
+      <div class="field"><label>深 (cm)</label><input type="number" id="wetH" step="0.5" min="20" oninput="wetApply()"></div>
+    </div>
+    <div class="wet-h">濕區磚（另外統計）</div>
+    <div class="row">
+      <div class="field"><label>磚長 (cm)</label><input type="number" id="wetTW" step="0.1" min="5" oninput="wetApply()"></div>
+      <div class="field"><label>磚寬 (cm)</label><input type="number" id="wetTH" step="0.1" min="5" oninput="wetApply()"></div>
+      <div class="field" style="max-width:70px"><label>縫 (mm)</label><input type="number" id="wetGrout" step="0.5" min="0" oninput="wetApply()"></div>
+      <div class="field" style="max-width:70px"><label>損耗 (%)</label><input type="number" id="wetWaste" min="0" max="30" oninput="wetApply()"></div>
+    </div>
+    <div class="wet-h">長條</div>
+    <div class="row">
+      <div class="field"><label>長條方向</label><select id="wetDir" onchange="wetApply()"><option value="short">平行短邊</option><option value="long">平行長邊</option></select></div>
+      <div class="field"><label>第一條位置</label><select id="wetFirstAt" onchange="wetApply()"><option value="start">上側</option><option value="end">下側</option></select></div>
+      <div class="field"><label>接縫</label><select id="wetJoin" onchange="wetApply()"><option value="align">對齊</option><option value="stagger">交丁</option></select></div>
+    </div>
+    <div class="row" style="align-items:flex-end">
+      <div class="field"><label>第一條寬 (cm)</label><input type="number" id="wetFirst" step="0.1" min="1" oninput="wetApply()"></div>
+      <div class="field"><label>其餘均分條數</label>
+        <div style="display:flex;gap:4px;align-items:center"><button class="btn btn-sm" onclick="wetStepN(-1)">−</button><input type="number" id="wetN" min="1" step="1" style="width:56px;text-align:center" oninput="wetApply(true)"><button class="btn btn-sm" onclick="wetStepN(1)">＋</button></div></div>
+      <div class="field"><label>均分後每條</label><div id="wetEach" style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--accent);padding:4px 0"></div></div>
+    </div>
+    <div id="wetInfo" class="info-tip" style="margin-top:6px;line-height:1.6"></div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn btn-sm btn-d" onclick="delWet()">刪除淋浴區</button>
+      <button class="btn btn-sm" onclick="closeWetModal();startWetDraw()">重新框選</button>
+      <button class="btn btn-sm btn-p" onclick="closeWetModal()">完成</button>
+    </div>
+  </div>
+</div>
+<style>.wet-h{font-size:11px;font-weight:600;color:var(--accent);margin:10px 0 4px}</style>
+
 <!-- 匯出圖面 Modal -->
 <div class="modal-overlay hidden" id="exportModal" onclick="if(event.target===this)closeExportModal()">
   <div class="modal" style="max-width:360px">
@@ -756,6 +796,7 @@ canvas{display:block}
       <button class="mode-btn active" id="modeSelect" onclick="setMode('select')">檢視</button>
       <button class="mode-btn" id="modeOrigin" onclick="setMode('origin')">設定起鋪點</button>
       <button class="mode-btn" id="modeProc" onclick="setMode('proc')">加工標記</button>
+      <button class="mode-btn" id="modeWet" onclick="setMode(state.mode==='wet'?'select':'wet')" title="在地磚圖上拖曳框出淋浴區（濕區）">框選淋浴區</button>
     </span>
     <!-- 壁磚圖導覽（切換主角面） -->
     <span id="v3dCtrl" style="display:none;align-items:center;gap:8px">
@@ -1406,7 +1447,7 @@ function setView(v){
   const floorCtrl=document.getElementById('floorModeCtrl');
   const wallCtrl=document.getElementById('wallNavCtrl');
   if(floorCtrl)floorCtrl.style.display=isFloor||isWall?'flex':'none';
-  {const pb=document.getElementById('modeProc');if(pb)pb.style.display='';}
+  {const pb=document.getElementById('modeProc');if(pb)pb.style.display='';const wb=document.getElementById('modeWet');if(wb)wb.style.display=isFloor?'':'none';}
   if(wallCtrl)wallCtrl.style.display=isWall?'flex':'none';
   const v3c=document.getElementById('v3dCtrl');
   if(v3c)v3c.style.display=v==='unfold'?'flex':'none';
@@ -1891,8 +1932,9 @@ function drawFirstTile(X0,Y0,PX,o,tw,th,W,H,strong){
 }
 function setMode(m){
   state.mode=m;
-  ['select','origin','proc'].forEach(x=>{document.getElementById('mode'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===m);});
-  canvas.style.cursor=m==='origin'?'crosshair':m==='proc'?'cell':'default';
+  ['select','origin','proc','wet'].forEach(x=>{const b=document.getElementById('mode'+x.charAt(0).toUpperCase()+x.slice(1));if(b)b.classList.toggle('active',x===m);});
+  canvas.style.cursor=m==='origin'||m==='wet'?'crosshair':m==='proc'?'cell':'default';
+  if(m!=='wet')state.wetDrag=null;
   {const b=document.getElementById('mode3dProc');if(b)b.classList.toggle('active',m==='proc');
    const tg=document.getElementById('proc3dType');if(tg)tg.style.display=m==='proc'?'flex':'none';
    const hp=document.getElementById('v3dHelp');if(hp)hp.style.display=m==='proc'?'none':'';
@@ -2372,7 +2414,7 @@ function renderStickerList(){
 // ---- 加工標記：所有面（地板、牆、柱面、管道間面、半牆、檯面）都可標 ----
 // proc：{type, face:'floor'|'seg:KEY'|'tub:ID:EDGE', x1,y1,x2,y2（面內 mm）}；舊資料沒有 face＝地板
 const procFace=pr=>pr.face||'floor';
-function floorPiecesAll(){const p=P(),d=innerDim();return layoutSurface(d.iw*10,d.ih*10,p.originX*10,p.originY*10,p.tileW,p.tileH,p.grout,p.layout,floorExclusions(p,d));}
+function floorPiecesAll(){return floorLayout();}
 function facePiecesAny(face){return face==='floor'?floorPiecesAll():facePieces(face);}
 // 找最近的磚邊（含裁切磚）
 function edgeNear(pieces,x,y,tol){
@@ -2964,7 +3006,7 @@ function renderFloorView(){
 
   // ---- TILES ----
   const floorExcl=floorExclusions(p,d);
-  const pieces=layoutSurface(innerWmm,innerHmm,originXmm,originYmm,p.tileW,p.tileH,p.grout,p.layout,floorExcl);
+  const pieces=floorLayout(p,d);
   let fullCount=0;state._tiles=[];
   const rawCuts=[];
   pieces.forEach(pc=>{
@@ -2993,7 +3035,14 @@ function renderFloorView(){
   if(state.showNum!==false)state._tiles.forEach(tile=>{
     drawTileLabel(tile.label,{x:tile.x,y:tile.y,cw:tile.w,ch:tile.h},tx(wtmm),ty(wtmm),PX,fObs,tile.isPartial&&state.showCut!==false?'#8B5E3C':'#8A8780');
   });
+  drawWetZone(tx(wtmm),ty(wtmm),PX);
   ctx.restore();
+  // 框選淋浴區中
+  if(state.wetDrag){const r=wetDragRect();if(r){
+    ctx.save();ctx.fillStyle='rgba(47,123,216,.12)';ctx.strokeStyle='#2F7BD8';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);
+    const X=tx(wtmm+r.x1),Y=ty(wtmm+r.y1),W=(r.x2-r.x1)*PX,H=(r.y2-r.y1)*PX;ctx.fillRect(X,Y,W,H);ctx.strokeRect(X,Y,W,H);
+    ctx.setLineDash([]);ctx.fillStyle='#2F7BD8';ctx.font='bold 11px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(`${Math.round(r.x2-r.x1)/10} × ${Math.round(r.y2-r.y1)/10} cm`,X+W/2,Y+H/2);ctx.restore();}}
 
   // Obstacles
   state.obstacles.forEach(o=>{
@@ -3149,8 +3198,7 @@ function renderFloorView(){
 
   if(state.view==='floor'){drawSnapHover();updateOrgBar();}
   // Stats
-  const orderBase=fullCount+uniqueCutSources;
-  const order=Math.ceil(orderBase*(1+p.waste/100));
+  const order=groupPlan(pieces.map(pc=>({face:'floor',pc})),{tileW:p.tileW,tileH:p.tileH},p.waste).order;
   document.getElementById('statFull').textContent=fullCount;
   document.getElementById('statCut').textContent=cutCount+(uniqueCutSources<cutCount?' ('+uniqueCutSources+'片磚)':'');
   document.getElementById('statOrder').textContent=order;
@@ -3179,8 +3227,9 @@ function hasVisibleSquare(r,excl,MIN=20){
   return false;
 }
 // 地板排除區：L 型缺角 + 管道間/柱/崁入浴缸（門窗在牆厚內，不影響地磚）
-function floorExclusions(p,d){
+function floorExclusions(p,d,noWet){
   const ex=spaceModel(p,d).outRects.slice();
+  if(!noWet){const z=wetZoneMM();if(z)ex.push({...z,type:'wet'});}
   state.obstacles.forEach(o=>{
     if(WALL_TYPES.has(o.type)||o.type==='column'||o.type==='pipe')return;
     ex.push({x1:o.x*10,y1:o.y*10,x2:(o.x+o.w)*10,y2:(o.y+o.h)*10});
@@ -3188,6 +3237,99 @@ function floorExclusions(p,d){
   // 嵌入式浴缸底下不鋪地磚
   state.stickers.forEach(st=>{if(st.type==='bathtub'&&!st._placing)ex.push(stkFootprint(st));});
   return ex;
+}
+// ---- 乾濕區：淋浴區（濕區）用長條磚，乾區延續原起鋪點、在分界處切掉 ----
+// state.wet={x,y,w,h（cm，室內座標）,tw,th（cm）,grout（mm）,waste,dir:'short'|'long',firstAt:'start'|'end',first（cm）,n（null=自動）,join:'align'|'stagger'}
+const WET_SAW=3; // 鋸片 3mm
+function wetZoneMM(){
+  const w=state.wet;if(!w)return null;const d=innerDim();
+  const x1=Math.max(0,w.x*10),y1=Math.max(0,w.y*10),x2=Math.min(d.iw*10,(w.x+w.w)*10),y2=Math.min(d.ih*10,(w.y+w.h)*10);
+  return x2-x1>=10&&y2-y1>=10?{x1,y1,x2,y2}:null;
+}
+function wetZoneType(){
+  const z=wetZoneMM();if(!z)return'';const sm=spaceModel(P(),innerDim());
+  const on=(axis,c,a,b)=>sm.segs.some(s=>s.axis===axis&&Math.abs(s.c-c)<5&&s.a<b-1&&s.b>a+1);
+  const t={T:on('h',z.y1,z.x1,z.x2),B:on('h',z.y2,z.x1,z.x2),L:on('v',z.x1,z.y1,z.y2),R:on('v',z.x2,z.y1,z.y2)};
+  const n=Object.values(t).filter(Boolean).length;
+  if(n===4)return'整間';if(n===3)return'一字分隔';
+  if(n===2)return(t.T&&t.B)||(t.L&&t.R)?'兩側分隔':'L 型分隔';
+  if(n===1)return'ㄇ字分隔';return'四邊分隔';
+}
+function wetHoriz(z,w){return((w.dir||'short')==='short')===((z.x2-z.x1)<=(z.y2-z.y1));} // true＝長條沿左右方向、往上下排
+function wetAutoN(span,f,g){return Math.max(1,Math.round((span-f)/(100+g)));}
+function wetLayout(){
+  const z=wetZoneMM();if(!z)return null;const w=state.wet;
+  const horiz=wetHoriz(z,w),W=z.x2-z.x1,H=z.y2-z.y1;
+  const len=horiz?W:H,span=horiz?H:W,g=+w.grout||0;
+  const tw=(+w.tw||60)*10,th=(+w.th||60)*10,L=Math.max(tw,th),S=Math.min(tw,th);
+  let f=Math.max(10,Math.min(span,(+w.first||0)*10));
+  let n=w.n!=null?Math.max(1,Math.round(+w.n)):wetAutoN(span,f,g);
+  let each=(span-f-g*n)/n;
+  if(each<10){n=0;each=0;f=span;}
+  const widths=[f].concat(Array(n).fill(each));
+  if(w.firstAt==='end')widths.reverse();
+  const strips=[];let pos=0;
+  widths.forEach((wd,i)=>{strips.push({o:pos,wd,first:w.firstAt==='end'?i===widths.length-1:i===0});pos+=wd+g;});
+  const otherEx=floorExclusions(P(),innerDim(),true);
+  const segs=[];
+  strips.forEach((st,si)=>{
+    const off=(w.join==='stagger'&&si%2===1)?(L+g)/2:0,rs=[];
+    for(let s0=-off;s0<len;s0+=L+g){const r0=Math.max(0,s0),r1=Math.min(len,s0+L);if(r1-r0>0.5)rs.push([r0,r1]);}
+    rs.forEach(([r0,r1],k)=>{
+      const rect=horiz?{x1:z.x1+r0,y1:z.y1+st.o,x2:z.x1+r1,y2:z.y1+st.o+st.wd}:{x1:z.x1+st.o,y1:z.y1+r0,x2:z.x1+st.o+st.wd,y2:z.y1+r1};
+      if(!hasVisibleSquare(rect,otherEx))return;
+      segs.push({...rect,len:r1-r0,wd:st.wd,strip:si,first:st.first,label:'W'+(si+1)+(rs.length>1?String.fromCharCode(97+k):'')});
+    });
+  });
+  // 用磚：沿磚長邊裁成長條；每片可裁 floor((短邊+鋸縫)/(條寬+鋸縫)) 條；各段長度依序排入長條（剩料可接用）
+  const byW={};segs.forEach(sg=>{const k=Math.round(sg.wd*10)/10;(byW[k]=byW[k]||[]).push(sg.len);});
+  let tiles=0;const groups=[];
+  Object.entries(byW).forEach(([k,lens])=>{
+    const bins=[];lens.sort((a,b)=>b-a).forEach(l=>{const i=bins.findIndex(r=>r>=l-0.5);if(i>=0)bins[i]-=l+WET_SAW;else bins.push(L-l-WET_SAW);});
+    const per=Math.max(1,Math.floor((S+WET_SAW)/(+k+WET_SAW))),t=Math.ceil(bins.length/per);
+    tiles+=t;groups.push({wd:+k,pieces:lens.length,bars:bins.length,per,tiles:t,over:+k>S+0.5});
+  });
+  groups.sort((a,b)=>b.wd-a.wd);
+  return{z,horiz,len,span,first:f,n,each,strips,segs,tiles,groups,L,S,tw,th,g,order:Math.ceil(tiles*(1+(+w.waste||0)/100))};
+}
+// 乾區地磚：延續原起鋪點，碰到淋浴區分界就切掉（直線切時算成一般裁切，可和其他裁切片配對）
+function floorLayout(p,d){
+  p=p||P();d=d||innerDim();
+  const pcs=layoutSurface(d.iw*10,d.ih*10,p.originX*10,p.originY*10,p.tileW,p.tileH,p.grout,p.layout,floorExclusions(p,d));
+  const z=wetZoneMM();if(!z)return pcs;
+  const other=floorExclusions(p,d,true);
+  pcs.forEach(pc=>{
+    const r={x1:pc.x,y1:pc.y,x2:pc.x+pc.cw,y2:pc.y+pc.ch};
+    if(!rectOverlap(r,z)||other.some(e=>rectOverlap(r,e)))return;
+    if(z.y1<=r.y1+.5&&z.y2>=r.y2-.5){if(z.x1<=r.x1+.5)r.x1=z.x2;else if(z.x2>=r.x2-.5)r.x2=z.x1;else return;}
+    else if(z.x1<=r.x1+.5&&z.x2>=r.x2-.5){if(z.y1<=r.y1+.5)r.y1=z.y2;else if(z.y2>=r.y2-.5)r.y2=z.y1;else return;}
+    else return;
+    pc.x=r.x1;pc.y=r.y1;pc.cw=r.x2-r.x1;pc.ch=r.y2-r.y1;
+    const wT=pc.cw<pc.tileW-.5,hT=pc.ch<pc.tileH-.5;
+    pc.isPartial=true;pc.cutDir=(wT&&hT)?'corner':wT?'vertical':'horizontal';
+  });
+  return pcs;
+}
+// 畫淋浴區長條（X,Y＝室內左上角在畫布上的位置）
+function drawWetZone(X,Y,PX){
+  const L=wetLayout();if(!L)return;const z=L.z;
+  ctx.save();ctx.setLineDash([]);
+  ctx.fillStyle='#FFF';ctx.fillRect(X+z.x1*PX,Y+z.y1*PX,(z.x2-z.x1)*PX,(z.y2-z.y1)*PX);
+  const lw=Math.max(0.6,L.g*PX);
+  L.segs.forEach(sg=>{
+    const x=X+sg.x1*PX,y=Y+sg.y1*PX,w=(sg.x2-sg.x1)*PX,h=(sg.y2-sg.y1)*PX;
+    ctx.fillStyle=sg.first?'#C9DDE8':'#DDEAF1';ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle='#8FAEC0';ctx.lineWidth=lw;ctx.strokeRect(x+lw/2,y+lw/2,w-lw,h-lw);
+  });
+  if(state.showNum!==false)L.segs.forEach(sg=>{
+    const w=(sg.x2-sg.x1)*PX,h=(sg.y2-sg.y1)*PX,fs=Math.min(state._px?LABEL_MM*PX:10,Math.min(w,h)*0.55);
+    if(fs<5)return;
+    ctx.fillStyle='#4F7489';ctx.font=`${fs}px DM Mono,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(sg.label,X+(sg.x1+sg.x2)/2*PX,Y+(sg.y1+sg.y2)/2*PX);
+  });
+  ctx.strokeStyle='#2F7BD8';ctx.lineWidth=Math.max(1.5,4*PX);ctx.setLineDash([6,4]);
+  ctx.strokeRect(X+z.x1*PX,Y+z.y1*PX,(z.x2-z.x1)*PX,(z.y2-z.y1)*PX);
+  ctx.restore();
 }
 // 在一個面上排磚，回傳每一片（已扣除排除區、小於 2cm 的碎片不列）
 function layoutSurface(surfW,surfH,originSX,originSY,tW,tH,grout,layout,excl){
@@ -3331,13 +3473,13 @@ function faceLayout(f){
 function calculateTubTiles(){
   const groups={};
   tubFaces().forEach(f=>{
-    const g=groups[f.spec.key]||(groups[f.spec.key]={spec:f.baseSpec||f.spec,full:0,cuts:[],faces:0});
-    g.faces++;
-    faceLayout(f).filter(pc=>pc.code==='main').forEach(pc=>{if(pc.isPartial)g.cuts.push(pc);else g.full++;});
+    const g=groups[f.spec.key]||(groups[f.spec.key]={spec:f.baseSpec||f.spec,full:0,cuts:[],faces:0,items:[]});
+    g.faces++;const id='tub:'+f.s.id+':'+f.edge;
+    faceLayout(f).filter(pc=>pc.code==='main').forEach(pc=>{g.items.push({face:id,pc});if(pc.isPartial)g.cuts.push(pc);else g.full++;});
   });
   return Object.values(groups).map(g=>{
-    const sources=pairCuts(g.cuts,0);
-    return{spec:g.spec,full:g.full,cut:g.cuts.length,sources,order:Math.ceil((g.full+sources)*(1+g.spec.waste/100)),faces:g.faces};
+    const sources=pairCuts(g.cuts.map(c=>({...c})),0),gp=groupPlan(g.items,g.spec,g.spec.waste);
+    return{spec:g.spec,full:g.full,cut:g.cuts.length,sources,order:gp.order,faces:g.faces};
   });
 }
 // 牆面上被浴缸擋住（缸緣以下）的範圍：不貼磚
@@ -3435,21 +3577,21 @@ function allWallFaces(){
 function calculateWallTiles(){
   const p=P();const d=innerDim();
   const wallHmm=p.wallH*10;
-  let full=0;const cuts=[];
-  wallSegs(p,d).forEach(seg=>{
-    facePieces('seg:'+seg.key).filter(pc=>pc.code==='main').forEach(pc=>{if(pc.isPartial)cuts.push(pc);else full++;});
+  let full=0;const cuts=[],items=[];
+  wallSegs(p,d).forEach(seg=>{const id='seg:'+seg.key;
+    facePieces(id).filter(pc=>pc.code==='main').forEach(pc=>{items.push({face:id,pc});if(pc.isPartial)cuts.push(pc);else full++;});
   });
-  const sources=pairCuts(cuts,0);
-  const rv=revealStats().main||null;
-  const order=Math.ceil((full+sources+(rv?rv.tiles:0))*(1+p.wallWaste/100));
-  return{full,cut:cuts.length,sources,order,reveal:rv};
+  const sources=pairCuts(cuts.map(c=>({...c})),0);
+  const rv=revealStats().main||null,gp=groupPlan(items,{tileW:p.wallTileW,tileH:p.wallTileH},0);
+  const order=Math.ceil((gp.base+(rv?rv.tiles:0))*(1+p.wallWaste/100));
+  return{full,cut:cuts.length,sources,order,reveal:rv,plan:gp};
 }
 // 壁磚編號（與地磚相同規則）：整磚依牆面順序 1、2、3…，裁切磚接續編號，同一片磚切兩塊標 a／b（可能跨不同牆面）
 // 浴缸半牆／檯面另外編號，前面加 T
 // 地磚編號（與地磚圖相同：整磚依序，裁切磚接續、成對標 a／b）
 function floorNumbering(){
   const p=P(),d=innerDim(),out=[],cuts=[];let n=0;
-  layoutSurface(d.iw*10,d.ih*10,p.originX*10,p.originY*10,p.tileW,p.tileH,p.grout,p.layout,floorExclusions(p,d)).forEach(pc=>{
+  floorLayout(p,d).forEach(pc=>{
     if(pc.isPartial){cuts.push(pc);out.push(pc);}else{n++;out.push(String(n));}});
   pairCuts(cuts,n);return out.map(v=>typeof v==='string'?v:v.label);
 }
@@ -3483,8 +3625,74 @@ function tileSummaryHtml(w,h,g,lay,waste){
 function refreshTileSummary(){
   const f=document.getElementById('floorTileSummary'),w=document.getElementById('wallTileSummary');if(!f||!w)return;
   const p=_Praw();
-  f.innerHTML=tileSummaryHtml(p.tileW/10,p.tileH/10,p.grout,p.layout,p.waste);
+  f.innerHTML=tileSummaryHtml(p.tileW/10,p.tileH/10,p.grout,p.layout,p.waste)+(state.spaceDone?wetSideHtml():'');
   w.innerHTML=tileSummaryHtml(p.wallTileW/10,p.wallTileH/10,p.wallGrout,p.wallLayout,p.wallWaste);
+}
+// ---- 淋浴區 UI ----
+function wetSnap(x,y){
+  const d=innerDim(),sm=spaceModel(P(),d),T=60;
+  x=Math.max(0,Math.min(d.iw*10,x));y=Math.max(0,Math.min(d.ih*10,y));
+  let bx=null,by=null;
+  sm.segs.forEach(s=>{if(s.axis==='v'&&Math.abs(s.c-x)<T&&(bx==null||Math.abs(s.c-x)<Math.abs(bx-x)))bx=s.c;if(s.axis==='h'&&Math.abs(s.c-y)<T&&(by==null||Math.abs(s.c-y)<Math.abs(by-y)))by=s.c;});
+  return[bx!=null?bx:Math.round(x/10)*10,by!=null?by:Math.round(y/10)*10];
+}
+function wetDragRect(){const g=state.wetDrag;if(!g)return null;return{x1:Math.min(g.x0,g.x1),y1:Math.min(g.y0,g.y1),x2:Math.max(g.x0,g.x1),y2:Math.max(g.y0,g.y1)};}
+function startWetDraw(){if(state.view!=='floor')setView('floor');setMode('wet');}
+function finishWetDrag(){
+  const r=wetDragRect();state.wetDrag=null;
+  if(!r||r.x2-r.x1<200||r.y2-r.y1<200){scheduleRender();return;}
+  const p=P(),old=state.wet||{};
+  state.wet={tw:old.tw||p.tileW/10,th:old.th||p.tileH/10,grout:old.grout!=null?old.grout:p.grout,waste:old.waste||0,dir:old.dir||'short',firstAt:old.firstAt||'start',first:old.first||15,n:null,join:old.join||'align',
+    x:r.x1/10,y:r.y1/10,w:(r.x2-r.x1)/10,h:(r.y2-r.y1)/10};
+  setMode('select');scheduleRender();showWetModal();
+}
+function wetFill(){
+  const w=state.wet;if(!w)return;const z=wetZoneMM(),L=wetLayout();
+  const sv=(id,v)=>{const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=v;};
+  sv('wetX',w.x);sv('wetY',w.y);sv('wetW',w.w);sv('wetH',w.h);sv('wetTW',w.tw);sv('wetTH',w.th);sv('wetGrout',w.grout);sv('wetWaste',w.waste||0);
+  sv('wetDir',w.dir||'short');sv('wetFirstAt',w.firstAt||'start');sv('wetJoin',w.join||'align');sv('wetFirst',w.first);
+  const horiz=z?wetHoriz(z,w):true,fa=document.getElementById('wetFirstAt');
+  fa.options[0].text=horiz?'上側':'左側';fa.options[1].text=horiz?'下側':'右側';
+  document.getElementById('wetType').textContent=wetZoneType();
+  if(!L){document.getElementById('wetEach').textContent='—';document.getElementById('wetInfo').textContent='範圍不在室內。';return;}
+  sv('wetN',L.n);
+  const c=v=>Math.round(v)/10;
+  document.getElementById('wetEach').textContent=L.n?c(L.each)+' cm':'—';
+  const warn=[];if(L.n&&L.each<80)warn.push('每條小於 8 cm，請減少條數');if(L.n===0)warn.push('剩餘寬度不足，只有第一條');
+  L.groups.filter(g=>g.over).forEach(g=>warn.push(`${c(g.wd)} cm 比磚的短邊寬，無法用這片磚裁出`));
+  document.getElementById('wetInfo').innerHTML=`長條${L.horiz?'左右':'上下'}方向，長 ${c(L.len)} cm${L.len>L.L?`（超過磚長，接縫${w.join==='stagger'?'交丁':'對齊'}）`:''}；排列寬度 ${c(L.span)} cm＝第一條 ${c(L.first)}${L.n?` ＋ ${L.n} 條 × ${c(L.each)}`:''}（含縫）<br>`+
+    L.groups.map(g=>`${c(g.wd)} cm 寬：一片磚可裁 ${g.per} 條，共 ${g.pieces} 段 → 約 ${g.tiles} 片`).join('<br>')+`<br><b>濕區磚約 ${L.tiles} 片</b>`+(warn.length?`<br><span style="color:#C0392B">⚠ ${warn.join('；')}</span>`:'');
+}
+function wetApply(nEdited){
+  const w=state.wet;if(!w)return;const g=id=>document.getElementById(id);
+  w.x=+g('wetX').value||0;w.y=+g('wetY').value||0;w.w=Math.max(20,+g('wetW').value||20);w.h=Math.max(20,+g('wetH').value||20);
+  w.tw=+g('wetTW').value||60;w.th=+g('wetTH').value||60;w.grout=Math.max(0,+g('wetGrout').value||0);w.waste=+g('wetWaste').value||0;
+  w.dir=g('wetDir').value;w.firstAt=g('wetFirstAt').value;w.join=g('wetJoin').value;w.first=+g('wetFirst').value||1;
+  if(nEdited){const n=Math.round(+g('wetN').value);if(n>=1)w.n=n;}
+  wetFill();scheduleRender();
+}
+function wetStepN(dv){const L=wetLayout();if(!L)return;state.wet.n=Math.max(1,(L.n||1)+dv);wetFill();scheduleRender();}
+function showWetModal(){if(!state.wet)return;wetFill();document.getElementById('wetModal').classList.remove('hidden');}
+function closeWetModal(){document.getElementById('wetModal').classList.add('hidden');refreshTileSummary();scheduleRender();}
+function delWet(){state.wet=null;closeWetModal();}
+function wetSideHtml(){
+  const L=wetLayout(),w=state.wet;
+  if(!L)return`<button class="btn btn-sm" style="margin-top:8px" onclick="startWetDraw()">＋ 框選淋浴區（濕區）</button>`;
+  const c=v=>Math.round(v)/10;
+  return`<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px"><span style="font-size:11px;font-weight:600;color:var(--accent)">濕區・淋浴間（${wetZoneType()}）</span><button class="btn btn-sm" onclick="showWetModal()">✎ 編輯</button></div>
+    <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">${w.tw} × ${w.th} <span style="font-size:11px;font-weight:400;color:var(--muted)">cm 裁長條</span></div>
+    <div class="info-tip" style="margin-top:2px">範圍 ${c(L.z.x2-L.z.x1)} × ${c(L.z.y2-L.z.y1)} cm・第一條 ${c(L.first)} cm${L.n?`＋${L.n} 條 × ${c(L.each)} cm`:''}</div>`;
+}
+function wetBlockHtml(){
+  const L=wetLayout(),w=state.wet;if(!L)return'';const c=v=>Math.round(v)/10;
+  return`<div class="sum-col"><div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 7px">濕區・淋浴間 長條磚（${wetZoneType()}）</div>
+    <div class="modal-stats">
+      <div class="modal-stat"><div class="modal-stat-l">長條</div><div class="modal-stat-v">${L.strips.length}</div><div class="modal-stat-u">條</div></div>
+      <div class="modal-stat"><div class="modal-stat-l">裁切段數</div><div class="modal-stat-v" style="color:var(--warn)">${L.segs.length}</div><div class="modal-stat-u">段</div></div>
+      <div class="modal-stat" style="grid-column:span 2"><div class="modal-stat-l">建議叫貨</div><div class="modal-stat-v" style="color:var(--accent)">${L.order}</div><div class="modal-stat-u">片</div></div>
+    </div>
+    <div class="modal-spec"><div style="display:flex;align-items:center;gap:10px">${tileIconSvg(L.tw,L.th,null)}<div style="font-size:13px;font-weight:600;color:var(--text)">${c(L.tw)} × ${c(L.th)} cm　<span style="font-weight:400;color:var(--muted);font-size:11px">裁成長條</span></div></div></div>
+    <div class="modal-note">範圍 ${c(L.z.x2-L.z.x1)} × ${c(L.z.y2-L.z.y1)} cm；第一條 ${c(L.first)} cm${L.n?`，其餘 ${L.n} 條各 ${c(L.each)} cm`:''}；長條長 ${c(L.len)} cm${L.len>L.L?`（接縫${w.join==='stagger'?'交丁':'對齊'}）`:''}<br>${L.groups.map(g=>`${c(g.wd)} cm 寬 ${g.pieces} 段：一片可裁 ${g.per} 條，約 ${g.tiles} 片`).join('<br>')}${w.waste?`<br>已含 ${w.waste}% 損耗`:''}</div></div>`;
 }
 function showTileModal(kind){document.getElementById(kind==='wall'?'tileModalWall':'tileModalFloor').classList.remove('hidden');}
 function closeTileModal(){['tileModalFloor','tileModalWall'].forEach(id=>document.getElementById(id).classList.add('hidden'));refreshTileSummary();scheduleRender();}
@@ -3689,7 +3897,7 @@ function tileGroupStats(){
     g.all.push({face:id,pc});g.faces.add(id);if(pc.isPartial)g.cuts.push(pc);else g.full++;});});
   const RV=revealStats();
   Object.entries(RV).forEach(([k,r])=>{if(!G[k])G[k]={spec:r.spec,full:0,cuts:[],faces:new Set(),all:[]};G[k].reveal=r;r.wins.forEach(w=>G[k].faces.add(w.face));});
-  Object.values(G).forEach(g=>{g.cut=g.cuts.length;g.sources=pairCuts(g.cuts,0);g.order=Math.ceil((g.full+g.sources+(g.reveal?g.reveal.tiles:0))*(1+(g.spec.waste||0)/100));});
+  Object.values(G).forEach(g=>{g.cut=g.cuts.length;g.sources=pairCuts(g.cuts.map(c=>({...c})),0);g.plan=groupPlan(g.all,g.spec,0);g.order=Math.ceil((g.plan.base+(g.reveal?g.reveal.tiles:0))*(1+(g.spec.waste||0)/100));});
   return G;
 }
 function wallNumbering(){
@@ -4189,6 +4397,7 @@ function renderUnfoldView(){
 
   // 地板（地磚設定，扣除缺角與地面障礙物）
   drawTileSurface(baseX,baseY,iWmm,iHmm,p.originX*10,p.originY*10,false,false,floorExclusions(p,d));
+  drawWetZone(baseX,baseY,PX);
   const notch=null;
   ctx.fillStyle='#EEF4F5';spaceModel(p,d).outRects.forEach(r=>ctx.fillRect(fx(r.x1),fy(r.y1),(r.x2-r.x1)*PX,(r.y2-r.y1)*PX));
   // 地面障礙物標示
@@ -4447,6 +4656,7 @@ function build3D(){
   const smodel=spaceModel(p,d);
   const fcv=offscreenSurface(iwmm,ihmm,s=>{
     drawTileSurface(0,0,iwmm,ihmm,p.originX*10,p.originY*10,false,false,floorExclusions(p,d),{tileW:p.tileW,tileH:p.tileH,grout:p.grout,layout:p.layout,labels:floorNumbering(),obs:floorObstacles(p,d)});
+    drawWetZone(0,0,s);
     smodel.outRects.forEach(r=>ctx.clearRect(r.x1*s,r.y1*s,(r.x2-r.x1)*s,(r.y2-r.y1)*s));
     ctx.fillStyle='#6E7274';smodel.cols.forEach(c=>{if(smodel.segs.some(g=>g.kind!=='wall'&&((g.axis==='h'&&(Math.abs(g.c-c.y1)<1||Math.abs(g.c-c.y2)<1))||(g.axis==='v'&&(Math.abs(g.c-c.x1)<1||Math.abs(g.c-c.x2)<1)))))ctx.fillRect(c.x1*s,c.y1*s,(c.x2-c.x1)*s,(c.y2-c.y1)*s);});
     // 加工標記（3D 僅顯示）
@@ -4464,7 +4674,8 @@ function build3D(){
   const floor=new THREE.Mesh(fgeo,new THREE.MeshBasicMaterial({map:texFrom(fcv),alphaTest:0.5,side:THREE.DoubleSide}));
   root.add(floor);
   {const fx=floorExclusions(p,d);
-   root.add(tileLines3D(layoutSurface(iwmm,ihmm,p.originX*10,p.originY*10,p.tileW,p.tileH,p.grout,p.layout,fx),fx,(x,y)=>new THREE.Vector3(x/10,0.2,y/10)));}
+   root.add(tileLines3D(floorLayout(p,d),fx,(x,y)=>new THREE.Vector3(x/10,0.2,y/10)));
+   const wl=wetLayout();if(wl)root.add(tileLines3D(wl.segs.map(g=>({x:g.x1,y:g.y1,cw:g.x2-g.x1,ch:g.y2-g.y1})),floorExclusions(p,d,true),(x,y)=>new THREE.Vector3(x/10,0.2,y/10)));}
 
   // ---- 柱 / 管道間：每根的外露面、範圍、靠著的房間牆 ----
   const smC=spaceModel(p,d),colInfo=[],colOfFace={};
@@ -5260,6 +5471,7 @@ canvas.addEventListener('mousedown',e=>{
   const p=P();const d=innerDim();const wtmm=p.wallT*10;
   const ix=wmx,iy=wmy;
 
+  if(state.mode==='wet'){const [x,y]=wetSnap(ix-wtmm,iy-wtmm);state.wetDrag={x0:x,y0:y,x1:x,y1:y};scheduleRender();return;}
   if(state.mode==='origin'){
     const r=floorSnapAt(cx,cy);if(!r)return;
     orgSetAnchor('floor',r.x,r.y,r.lbl||'自由點');return;
@@ -5314,6 +5526,11 @@ canvas.addEventListener('mousedown',e=>{
 });
 
 canvas.addEventListener('mousemove',e=>{
+  if(state.mode==='wet'&&state.view==='floor'){
+    if(state.wetDrag){const rc=canvas.getBoundingClientRect(),[wx,wy]=toWorld(e.clientX-rc.left,e.clientY-rc.top),wt=P().wallT*10;
+      const [x,y]=wetSnap(wx-wt,wy-wt);state.wetDrag.x1=x;state.wetDrag.y1=y;scheduleRender();}
+    canvas.style.cursor='crosshair';return;
+  }
   if(state.mode==='proc'&&state.view==='floor'){
     const rc=canvas.getBoundingClientRect(),[wx,wy]=toWorld(e.clientX-rc.left,e.clientY-rc.top),wt=P().wallT*10;
     const h=procEdgeAt(wx-wt,wy-wt),old=state.procHover;
@@ -5357,7 +5574,7 @@ canvas.addEventListener('mousemove',e=>{
   }
 });
 
-canvas.addEventListener('mouseup',()=>{state.dragging=null;});
+canvas.addEventListener('mouseup',()=>{state.dragging=null;if(state.wetDrag)finishWetDrag();});
 canvas.addEventListener('mouseleave',()=>{state.dragging=null;if(state.snapHover||state.procHover){state.snapHover=null;state.procHover=null;scheduleRender();}});
 
 function zoom(d){if(is3D()){V3.radius=Math.max(30,V3.radius*(d>0?0.8:1.25));draw3D();return;}state.scale=Math.max(0.25,Math.min(5,state.scale+d));document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';scheduleRender();}
@@ -5452,7 +5669,7 @@ function exportJSON(){
       lShape:p.lShape,lCorner:p.lCorner,lCutW:p.lCutW,lCutH:p.lCutH,
       roomShape:document.getElementById('roomShape').value
     },
-    version2:{space:{steps:state.space.steps},wallOrgs:state.wallOrgs||{},floorOrg:state.floorOrg||null,tileTypes:state.tileTypes||[],faceTiles:state.faceTiles||{},spaceDone:!!state.spaceDone},
+    version2:{space:{steps:state.space.steps},wallOrgs:state.wallOrgs||{},floorOrg:state.floorOrg||null,tileTypes:state.tileTypes||[],faceTiles:state.faceTiles||{},wet:state.wet||null,spaceDone:!!state.spaceDone},
     obstacles:state.obstacles,
     stickers:state.stickers,
     procs:state.procs
@@ -5480,7 +5697,7 @@ function importJSON(e){
       setV('roomShape',pm.roomShape||'rect');
       const v2=data.version2||{};
       state.space={steps:(v2.space&&v2.space.steps)||[]};
-      state.wallOrgs=v2.wallOrgs||{};state.floorOrg=v2.floorOrg||null;state.tileTypes=v2.tileTypes||[];state.faceTiles=v2.faceTiles||{};renderTileTypes();
+      state.wallOrgs=v2.wallOrgs||{};state.floorOrg=v2.floorOrg||null;state.tileTypes=v2.tileTypes||[];state.faceTiles=v2.faceTiles||{};state.wet=v2.wet||null;renderTileTypes();
       _space.key='';_space.model=null; // 重新建立空間，不做牆面換算
       state.obstacles=data.obstacles||[];
       state.stickers=data.stickers||[];
@@ -5512,6 +5729,71 @@ function procStatsFor(items){
   (items||[]).forEach(it=>{const ts=pieceProcTypes(it.face,it.pc);if(!ts.size)r.plain++;else ts.forEach(t=>r.types[t]=(r.types[t]||0)+1);});
   return r;
 }
+// ---- 背斜加工：依手動「工廠背斜切」標記分類、合併，算出要給工廠加工的磚 ----
+const BEV='工廠背斜切',BEV_GAP=10,BEV_LOSS=5; // 合併：兩片寬度相加＋1cm 要「小於」整磚寬；單片背斜損耗約 5mm
+function pieceBevelEdges(face,pc){
+  const X1=pc.x,Y1=pc.y,X2=pc.x+pc.cw,Y2=pc.y+pc.ch;
+  const es={T:{x1:X1,y1:Y1,x2:X2,y2:Y1},B:{x1:X1,y1:Y2,x2:X2,y2:Y2},L:{x1:X1,y1:Y1,x2:X1,y2:Y2},R:{x1:X2,y1:Y1,x2:X2,y2:Y2}};
+  const out=new Set();
+  (state.procs||[]).forEach(pr=>{if(pr.type!==BEV||procFace(pr)!==face)return;
+    const a={x1:Math.min(pr.x1,pr.x2),y1:Math.min(pr.y1,pr.y2),x2:Math.max(pr.x1,pr.x2),y2:Math.max(pr.y1,pr.y2)};
+    Object.entries(es).forEach(([k,e])=>{if(sameEdge(a,e))out.add(k);});});
+  return[...out];
+}
+// items：同一種磚的 [{face,pc}]；回傳 {used:Set(背斜片), cats:{'長單邊背斜':磚數…}, rems:[剩料], tiles}
+function bevelPlan(items,spec){
+  const tW=spec.tileW,tH=spec.tileH,sq=Math.abs(tW-tH)<1,LONG=Math.max(tW,tH);
+  const cls=e=>sq?'':(((e==='T'||e==='B')?tW:tH)>=LONG-0.5?'長':'短');
+  const used=new Set(),cats={},rems=[],singles=[];
+  const add=k=>cats[k]=(cats[k]||0)+1;
+  (items||[]).forEach(({face,pc})=>{
+    const es=pieceBevelEdges(face,pc);if(!es.length)return;used.add(pc);
+    const hs=es.filter(e=>e==='T'||e==='B'),vs=es.filter(e=>e==='L'||e==='R');
+    if(es.length===1){
+      const e=es[0],h=e==='T'||e==='B',wd=h?pc.ch:pc.cw,full=h?tH:tW;
+      if(!pc.isPartial||wd>=full-0.5){add(cls(e)+'單邊背斜');return;}
+      singles.push({cls:cls(e),h,wd,full});
+    } else if(es.length===2&&(hs.length===2||vs.length===2))add(cls(es[0])+'雙邊背斜');
+    else if(es.length===2)add(sq?'相鄰兩邊背斜':'長短邊背斜');
+    else add(es.length+'邊背斜');
+  });
+  // 兩片單邊、同一種邊、都不是整磚、寬度相加＋1cm 小於整磚寬 → 合併成一片雙邊（只考慮兩片）
+  singles.sort((a,b)=>b.wd-a.wd);const done=new Set();
+  singles.forEach((a,i)=>{
+    if(done.has(i))return;done.add(i);
+    let j=-1;for(let k=i+1;k<singles.length;k++){const b=singles[k];if(!done.has(k)&&b.cls===a.cls&&b.h===a.h&&Math.abs(b.full-a.full)<1&&a.wd+b.wd+BEV_GAP<a.full){j=k;break;}}
+    if(j>=0){done.add(j);add(a.cls+'雙邊背斜');rems.push({h:a.h,rem:a.full-a.wd-singles[j].wd-BEV_GAP});}
+    else{add(a.cls+'單邊背斜');rems.push({h:a.h,rem:a.full-a.wd-BEV_LOSS});}
+  });
+  return{used,cats,rems,tiles:Object.values(cats).reduce((s,n)=>s+n,0)};
+}
+// 一種磚的叫貨：一般整磚＋裁切（配對）＋背斜加工磚；背斜剩料可再供其他直線裁切片
+function groupPlan(items,spec,waste){
+  const bev=bevelPlan(items,spec);
+  let full=0;const cuts=[];
+  (items||[]).forEach(({pc})=>{if(bev.used.has(pc))return;if(pc.isPartial)cuts.push({...pc});else full++;});
+  let absorbed=0;
+  cuts.sort((a,b)=>(b.cutDir==='horizontal'?b.ch:b.cw)-(a.cutDir==='horizontal'?a.ch:a.cw));
+  const rest=cuts.filter(c=>{
+    if(c.cutDir!=='horizontal'&&c.cutDir!=='vertical')return true;
+    const h=c.cutDir==='horizontal',w=h?c.ch:c.cw;
+    const r=bev.rems.filter(r=>r.h===h&&r.rem>=w+4).sort((a,b)=>a.rem-b.rem)[0];
+    if(!r)return true;r.rem-=w+4;absorbed++;return false;});
+  const sources=pairCuts(rest,0);
+  return{full,cut:cuts.length,sources,bev,bevTiles:bev.tiles,absorbed,base:full+sources+bev.tiles,order:Math.ceil((full+sources+bev.tiles)*(1+(waste||0)/100))};
+}
+// 背斜磚圖示：長邊／短邊、單邊／雙邊畫紅線
+function bevelIconSvg(wmm,hmm,cat){
+  const M=44,k=M/Math.max(wmm,hmm),w=Math.max(10,wmm*k),h=Math.max(10,hmm*k),col=PROC_COLORS[BEV]||'#E24B4A';
+  const longH=w>=h,short=cat.startsWith('短'),useH=short?!longH:longH; // 標在橫向邊（上下）或直向邊（左右）
+  const dbl=cat.includes('雙'),L=[];
+  if(cat.includes('長短')||cat.includes('相鄰')){L.push([4,4,w+4,4],[4,4,4,h+4]);}
+  else if(/^\d/.test(cat)){L.push([4,4,w+4,4],[4,h+4,w+4,h+4],[4,4,4,h+4]);}
+  else if(useH){L.push([4,4,w+4,4]);if(dbl)L.push([4,h+4,w+4,h+4]);}
+  else{L.push([4,4,4,h+4]);if(dbl)L.push([w+4,4,w+4,h+4]);}
+  return `<svg width="${w+8}" height="${h+8}" viewBox="0 0 ${w+8} ${h+8}" style="flex:none"><rect x="4" y="4" width="${w}" height="${h}" fill="#F7F1E4" stroke="#8A8780" stroke-width="1"/>`+
+    L.map(([a,b,c,d])=>`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="${col}" stroke-width="4" stroke-linecap="round"/>`).join('')+`</svg>`;
+}
 // 磚尺寸圖示：依長寬比例畫矩形，加工磚在其中一邊畫色線
 function tileIconSvg(wmm,hmm,procType){
   const M=44,k=M/Math.max(wmm,hmm),w=Math.max(10,wmm*k),h=Math.max(10,hmm*k),col=procType?PROC_COLORS[procType]:null;
@@ -5520,11 +5802,17 @@ function tileIconSvg(wmm,hmm,procType){
 }
 // 一欄的「磚尺寸＋一般／加工」預覽
 function tileSpecHtml(spec,items){
-  const w=spec.tileW,h=spec.tileH,st=procStatsFor(items);
-  const cell=(ic,lb,n)=>`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:54px">${ic}<div style="font-size:10px;color:var(--muted)">${lb}</div><div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">${n} 片</div></div>`;
+  const w=spec.tileW,h=spec.tileH,sz=`${Math.round(w)/10}×${Math.round(h)/10}cm`;
+  const bev=bevelPlan(items,spec);
+  let plain=0,field=0;(items||[]).forEach(it=>{const ts=pieceProcTypes(it.face,it.pc);if(!ts.size)plain++;if(ts.has('現場導角'))field++;});
+  const cell=(ic,lb,n,u='片')=>`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:58px">${ic}<div style="font-size:10px;color:var(--muted);text-align:center">${lb}</div><div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">${n} ${u}</div></div>`;
+  const ord=['長單邊背斜','長雙邊背斜','短單邊背斜','短雙邊背斜','單邊背斜','雙邊背斜'];
+  const keys=Object.keys(bev.cats).sort((a,b)=>(ord.indexOf(a)+99*(ord.indexOf(a)<0))-(ord.indexOf(b)+99*(ord.indexOf(b)<0)));
   return `<div style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">${Math.round(w)/10} × ${Math.round(h)/10} cm</div>`+
-    `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">`+cell(tileIconSvg(w,h,null),'一般',st.plain)+
-    Object.keys(PROC_COLORS).map(t=>cell(tileIconSvg(w,h,t),t,st.types[t]||0)).join('')+`</div>`;
+    `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">`+cell(tileIconSvg(w,h,null),'一般',plain)+
+    keys.map(k=>cell(bevelIconSvg(w,h,k),`${sz}<br>${k}`,bev.cats[k])).join('')+
+    (field?cell(tileIconSvg(w,h,'現場導角'),'現場導角',field):'')+`</div>`+
+    (bev.used.size?`<div style="font-size:10.5px;color:var(--muted);margin-top:5px">背斜：${bev.used.size} 個位置共用 ${bev.tiles} 片加工磚（已計入叫貨），剩料再用於其他裁切</div>`:'');
 }
 function showSummaryModal(){
   // 地磚數量在地磚圖計算；目前不在地磚圖時先算一次
@@ -5556,6 +5844,7 @@ function showSummaryModal(){
     </div>
     <div class="modal-spec">${tileSpecHtml(t.spec,((G0['T'+t.spec.key]||{}).all)||[])}</div>
     <div class="modal-note">未併入上方${t.spec.name}數量；同規格請相加叫貨（${t.spec.name}合計約 ${t.order+(t.spec.key==='wall'?wr.order:(+document.getElementById('mStatOrder').textContent||0))} 片）。</div></div>`).join('');
+  document.getElementById('mTubBlock').insertAdjacentHTML('afterbegin',wetBlockHtml());
   {const cf=state._conflicts||[];document.getElementById('mConflicts').innerHTML=cf.length?`<div style="background:#FFF4E5;border:1px solid #E8B37A;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#8A4B0F"><b>⚠ 需要注意（${cf.length}）</b>${cf.map(c=>`<div style="margin-top:3px">• ${c.msg}</div>`).join('')}</div>`:'';}
   // 特殊磚
   const G=tileGroupStats(),lnm={straight:'平貼',half:'1/2交丁（橫）',third:'1/3交丁（橫）','half-v':'1/2交丁（直）'};
