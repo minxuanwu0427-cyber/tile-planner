@@ -1855,7 +1855,7 @@ function obClearAnchor(){
 function obResetOff(){const o=orgRaw(state.orgSel);o.dx=0;o.dy=0;orgStore(state.orgSel,o);}
 function updateFtBar(force){
   const bar=document.getElementById('ftBar');if(!bar)return;
-  const show=state.spaceDone&&state.view==='wall';bar.style.display=show?'flex':'none';if(!show)return;
+  bar.style.display='none';return; // 已併入起鋪點下拉（顯示各區磚種）
   const fs=orgBarFaces(true);if(!fs.length)return;
   const ff=fs.filter(f=>!f.region);
   if(!fs.some(f=>f.id===state.orgSel)&&ff[0])state.orgSel=ff[0].id;
@@ -1877,9 +1877,10 @@ function ftSet(){
 function obRotate(){const pt=state.orgSel.split(':');if(pt[0]==='tub')toggleTubRot(pt[1],pt[2]);}
 // 數值列
 function orgBarFaces(all){ // all：連同已分區的整面（磚種列用）
-  const regs=(f,lbl,list)=>list.map(r=>({id:f+'#'+r.z.id,lbl:lbl+'・'+(r.z.name||'區域'),region:true}));
-  if(state.view==='floor'){const sp=!all&&faceIsSplit('floor');return(sp?[]:[{id:'floor',lbl:'地磚'}]).concat(regs('floor','地磚',floorZoneList().filter(r=>!r.strip)));}
-  return(state._wHits||[]).flatMap(h=>h.kind==='seg'?(!all&&faceIsSplit('seg:'+h.seg.key)?[]:[{id:'seg:'+h.seg.key,lbl:'牆'+h.seg.tag}]).concat(regs('seg:'+h.seg.key,'牆'+h.seg.tag,faceRegions('seg:'+h.seg.key,faceBase('seg:'+h.seg.key)))):[{id:'tub:'+h.face.s.id+':'+h.face.edge,lbl:h.face.label}]);
+  const regs=(f,lbl,list)=>list.map(r=>({id:f+'#'+r.z.id,lbl:lbl+'・'+(r.z.name||'區域')+'（'+r.spec.name+'）',region:true}));
+  const ft=id=>'（'+zedTileName(id,(faceCfg(id)||{}).type||'main')+'）';
+  if(state.view==='floor'){const sp=!all&&faceIsSplit('floor');return(sp?[]:[{id:'floor',lbl:'地磚'+ft('floor')}]).concat(regs('floor','地磚',floorZoneList().filter(r=>!r.strip)));}
+  return(state._wHits||[]).flatMap(h=>h.kind==='seg'?(!all&&faceIsSplit('seg:'+h.seg.key)?[]:[{id:'seg:'+h.seg.key,lbl:'牆'+h.seg.tag+ft('seg:'+h.seg.key)}]).concat(regs('seg:'+h.seg.key,'牆'+h.seg.tag,faceRegions('seg:'+h.seg.key,faceBase('seg:'+h.seg.key)))):[{id:'tub:'+h.face.s.id+':'+h.face.edge,lbl:h.face.label}]);
 }
 // 起鋪點：右鍵鎖定要設定的區域（左鍵只改鎖定的區域，避免點到相鄰區）
 function orgTargetAt(e){
