@@ -128,6 +128,13 @@ canvas{display:block}
 .sb-header-title{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.12em;color:var(--faint);text-transform:uppercase}
 .sb-chevron{font-size:10px;color:var(--faint);transition:transform .2s}
 .sb-chevron.open{transform:rotate(180deg)}
+.hist-btn{font-size:15px;line-height:1;padding:4px 9px}.hist-btn:disabled{opacity:.35;cursor:default}
+.icon-btn{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:5px;background:#fff;cursor:pointer;font-size:12px;color:var(--text);padding:0}
+.icon-btn:hover{background:var(--accent-l);border-color:var(--accent)}
+.tile-item{padding:8px 0;border-bottom:1px dashed var(--border)}.tile-item:last-child{border-bottom:none}
+.tile-item-h{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.tile-dot{width:9px;height:9px;border-radius:50%;border:1px solid rgba(0,0,0,.25);flex:none}
+.tile-name{flex:1;font-size:12px;font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-body{padding:13px;padding-top:8px}
 .sb-body.hidden{display:none}
 /* Category group labels */
@@ -183,8 +190,6 @@ canvas{display:block}
 <header>
   <div class="logo">TILE<span>—</span>PLANNER <span style="font-weight:300;margin-left:4px">放樣計畫</span></div>
   <div style="display:flex;gap:7px;align-items:center">
-    <button class="btn btn-sm" id="undoBtn" onclick="histUndo()" title="上一步（Ctrl+Z）" disabled>↶ 上一步</button>
-    <button class="btn btn-sm" id="redoBtn" onclick="histRedo()" title="下一步（Ctrl+Y／Ctrl+Shift+Z）" disabled>↷ 下一步</button>
     <button class="btn btn-sm" onclick="showExportModal()">匯出圖面</button>
     <button class="btn btn-sm" onclick="exportJSON()" title="儲存目前所有設定為 JSON 檔">存檔</button>
     <label class="btn btn-sm" style="cursor:pointer" title="載入之前儲存的 JSON 檔">載入<input type="file" accept=".json" style="display:none" onchange="importJSON(event)"></label>
@@ -262,28 +267,30 @@ canvas{display:block}
     </div><!-- /sb-body sbRoom -->
   </div>
 
-  <!-- 地磚設定（只顯示摘要，編輯用彈跳視窗） -->
+  <!-- 地磚設定（只顯示已設定的資訊；✎ 編輯乾區地磚、＋ 新增濕區） -->
   <div class="sb-collapsible">
-    <div class="sb-header" style="cursor:default" onclick="">
+    <div class="sb-header" onclick="toggleTileSb('sbTile')">
       <span class="sb-header-title">地磚設定</span>
-      <button class="btn btn-sm" onclick="showTileModal('floor')">✎ 編輯</button>
+      <span style="display:flex;align-items:center;gap:4px">
+        <button class="icon-btn" title="編輯乾區地磚" onclick="event.stopPropagation();showTileModal('floor')">✎</button>
+        <button class="icon-btn" id="floorAddBtn" title="新增濕區地磚（點選淋浴區）" onclick="event.stopPropagation();startWetDraw()">＋</button>
+        <span class="sb-chevron open" id="chevronsbTile" style="margin-left:4px">▼</span>
+      </span>
     </div>
     <div class="sb-body" id="sbTile"><div id="floorTileSummary"></div></div>
   </div>
 
-  <!-- 壁磚設定（只顯示摘要，編輯／新增用彈跳視窗） -->
+  <!-- 壁磚設定（✎ 編輯壁磚、＋ 新增特殊磚；特殊磚有加入才顯示） -->
   <div class="sb-collapsible">
-    <div class="sb-header" style="cursor:default" onclick="">
+    <div class="sb-header" onclick="toggleTileSb('sbWallTile')">
       <span class="sb-header-title">壁磚設定</span>
-      <button class="btn btn-sm" onclick="showTileModal('wall')">✎ 編輯</button>
+      <span style="display:flex;align-items:center;gap:4px">
+        <button class="icon-btn" title="編輯壁磚" onclick="event.stopPropagation();showTileModal('wall')">✎</button>
+        <button class="icon-btn" title="新增特殊磚（某面牆或下半段改用不同的磚）" onclick="event.stopPropagation();addTileType()">＋</button>
+        <span class="sb-chevron open" id="chevronsbWallTile" style="margin-left:4px">▼</span>
+      </span>
     </div>
-    <div class="sb-body" id="sbWallTile">
-    <div id="wallTileSummary"></div>
-    <div style="font-size:11px;font-weight:600;color:var(--accent);margin:12px 0 4px">特殊磚 <span style="font-weight:400;color:var(--muted)">（某面牆或下半段改用不同的磚）</span></div>
-    <div id="tileTypeList"></div>
-    <button class="btn btn-sm" style="margin-top:4px" onclick="addTileType()">＋ 新增特殊磚</button>
-    <div class="info-tip" style="margin-top:4px">新增後到壁磚圖，在上方「磚種」列指定哪一面（或下半段）使用。編號與磚量會依磚種分開計算。</div>
-    </div>
+    <div class="sb-body" id="sbWallTile"><div id="wallTileSummary"></div><div id="tileTypeList"></div></div>
   </div>
 
   <div class="sb-group-label">圖面標示</div>
@@ -490,7 +497,8 @@ canvas{display:block}
 <!-- 地磚／壁磚設定 Modal -->
 <div class="modal-overlay hidden" id="tileModalFloor" onclick="if(event.target===this)closeTileModal()">
   <div class="modal" style="max-width:380px">
-    <div class="modal-title">地磚設定</div>
+    <div class="modal-title">乾區地磚設定</div>
+    <div class="field" style="margin-bottom:8px"><label>名稱</label><input type="text" id="floorTileName" oninput="state.tileNames=state.tileNames||{};state.tileNames.floor=this.value;refreshTileSummary()"></div>
     <div class="row">
       <div class="field"><label>磚長 (cm)</label><input type="number" id="tileW" value="60" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
       <div class="field"><label>磚寬 (cm)</label><input type="number" id="tileH" value="60" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
@@ -508,6 +516,7 @@ canvas{display:block}
 <div class="modal-overlay hidden" id="tileModalWall" onclick="if(event.target===this)closeTileModal()">
   <div class="modal" style="max-width:380px">
     <div class="modal-title">壁磚設定</div>
+    <div class="field" style="margin-bottom:8px"><label>名稱</label><input type="text" id="wallTileName" oninput="state.tileNames=state.tileNames||{};state.tileNames.wall=this.value;refreshTileSummary()"></div>
     <div class="row">
       <div class="field"><label>磚長 (cm)</label><input type="number" id="wallTileW" value="120" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
       <div class="field"><label>磚寬 (cm)</label><input type="number" id="wallTileH" value="60" min="5" max="300" step="0.1" oninput="scheduleRender()"></div>
@@ -554,6 +563,7 @@ canvas{display:block}
 <div class="modal-overlay hidden" id="wetModal" onclick="if(event.target===this)closeWetModal()">
   <div class="modal" style="max-width:440px">
     <div class="modal-title">淋浴區（濕區）設定　<span id="wetType" style="font-size:12px;color:var(--muted);font-weight:400"></span></div>
+    <div class="field" style="margin-bottom:4px"><label>名稱</label><input type="text" id="wetName" oninput="if(state.wet){state.wet.name=this.value;refreshTileSummary();}"></div>
     <div class="wet-h">轉角位置（cm，距左／距上，從室內左上角量起）</div>
     <div id="wetPts" style="max-height:170px;overflow:auto"></div>
     <div class="wet-h">濕區磚（另外統計）</div>
@@ -759,6 +769,8 @@ canvas{display:block}
       <button class="view-tab" id="vtFloor" onclick="setView('floor')">地磚圖</button>
       <button class="view-tab" id="vtWall" onclick="setView('wall')">壁磚圖</button>
     </div>
+    <button class="btn btn-sm hist-btn" id="undoBtn" onclick="histUndo()" title="上一步（Ctrl+Z）" disabled>↶</button>
+    <button class="btn btn-sm hist-btn" id="redoBtn" onclick="histRedo()" title="下一步（Ctrl+Y／Ctrl+Shift+Z）" disabled>↷</button>
     <button class="btn btn-sm" id="editSpaceBtn" style="display:none" onclick="editSpace()">✎ 編輯空間</button>
     <span id="spaceBar" style="display:none;align-items:center;padding:3px 8px;border-radius:4px;background:#FFF4E5;color:#B5651D;font-size:12px">① 空間設定中：設定外形與柱／管道間後，按左側「完成空間設定」</span>
     <div style="width:1px;height:18px;background:var(--border);margin:0 4px"></div>
@@ -3642,7 +3654,8 @@ const LAYOUT_NAME={straight:'平貼',half:'1/2 交丁（橫）',third:'1/3 交�
 function addTileType(){
   state.tileTypes=state.tileTypes||[];
   let i=1;while(state.tileTypes.some(t=>t.code==='S'+i))i++;
-  state.tileTypes.push({code:'S'+i,name:'特殊磚'+i,w:60,h:60,grout:2,layout:'straight',waste:0,color:TT_COLORS[(i-1)%TT_COLORS.length]});
+  const used=new Set(state.tileTypes.map(t=>t.name));let li=0;while(used.has('特殊磚'+String.fromCharCode(65+li)))li++;
+  state.tileTypes.push({code:'S'+i,name:'特殊磚'+String.fromCharCode(65+li),w:60,h:60,grout:2,layout:'straight',waste:0,color:TT_COLORS[(i-1)%TT_COLORS.length]});
   renderTileTypes();updateFtBar(true);scheduleRender();
   openTileTypeModal('S'+i,true);
 }
@@ -3657,11 +3670,21 @@ function tileSummaryHtml(w,h,g,lay,waste){
   return `<div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)">${w} × ${h} <span style="font-size:11px;font-weight:400;color:var(--muted)">cm</span></div>
     <div class="info-tip" style="margin-top:2px">縫 ${g} mm　・　${LAYOUT_NAME[lay]||lay}　・　損耗 ${waste}%</div>`;
 }
+// 磚種名稱（側欄小標題、統計標題）
+const TILE_DOT={floor:'#E8E4DC',wall:'#EFE6CF',wet:'#C9DDE8'};
+function tileName(k){const n=(state.tileNames||{})[k];return n&&n.trim()?n:(k==='floor'?'乾區地磚A':'壁磚A');}
+function wetName(){return state.wet&&state.wet.name&&state.wet.name.trim()?state.wet.name:'濕區地磚B';}
+const escH=t=>String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function tileItemHtml(dot,name,body,actions){
+  return`<div class="tile-item"><div class="tile-item-h"><span class="tile-dot" style="background:${dot}"></span><span class="tile-name" title="${escH(name)}">${escH(name)}</span>${actions||''}</div>${body}</div>`;
+}
+function toggleTileSb(id){const b=document.getElementById(id),c=document.getElementById('chevron'+id);if(!b)return;const hid=b.classList.toggle('hidden');if(c)c.classList.toggle('open',!hid);}
 function refreshTileSummary(){
   const f=document.getElementById('floorTileSummary'),w=document.getElementById('wallTileSummary');if(!f||!w)return;
   const p=_Praw();
-  f.innerHTML=tileSummaryHtml(p.tileW/10,p.tileH/10,p.grout,p.layout,p.waste)+(state.spaceDone?wetSideHtml():'');
-  w.innerHTML=tileSummaryHtml(p.wallTileW/10,p.wallTileH/10,p.wallGrout,p.wallLayout,p.wallWaste);
+  f.innerHTML=tileItemHtml(TILE_DOT.floor,tileName('floor'),tileSummaryHtml(p.tileW/10,p.tileH/10,p.grout,p.layout,p.waste))+(state.spaceDone?wetSideHtml():'');
+  w.innerHTML=tileItemHtml(TILE_DOT.wall,tileName('wall'),tileSummaryHtml(p.wallTileW/10,p.wallTileH/10,p.wallGrout,p.wallLayout,p.wallWaste));
+  const ab=document.getElementById('floorAddBtn');if(ab)ab.style.display=state.wet?'none':'';
 }
 // ---- 淋浴區 UI ----
 // 點選淋浴區：沿用起鋪點的吸附點；每段邊強制水平／垂直；回到起點、雙擊或 Enter 完成
@@ -3725,7 +3748,7 @@ function wetSetPt(i,ax,v){
   const w=state.wet;if(!w)return;const z=wetZoneMM(),L=wetLayout();
   const sv=(id,v)=>{const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=v;};
   {const box=document.getElementById('wetPts');if(box&&(ptsToo||!box.contains(document.activeElement)))box.innerHTML=wetPtsHtml();}
-  sv('wetTW',w.tw);sv('wetTH',w.th);sv('wetGrout',w.grout);sv('wetWaste',w.waste||0);
+  sv('wetName',wetName());sv('wetTW',w.tw);sv('wetTH',w.th);sv('wetGrout',w.grout);sv('wetWaste',w.waste||0);
   sv('wetDir',w.dir||'short');sv('wetFirstAt',w.firstAt||'start');sv('wetJoin',w.join||'align');sv('wetFirst',w.first);
   const horiz=z?wetHoriz(z,w):true,fa=document.getElementById('wetFirstAt');
   fa.options[0].text=horiz?'上側':'左側';fa.options[1].text=horiz?'下側':'右側';
@@ -3751,12 +3774,11 @@ function showWetModal(){if(!state.wet)return;wetFill(true);document.getElementBy
 function closeWetModal(){document.getElementById('wetModal').classList.add('hidden');refreshTileSummary();scheduleRender();}
 function delWet(){state.wet=null;closeWetModal();}
 function wetSideHtml(){
-  const L=wetLayout(),w=state.wet;
-  if(!L)return`<button class="btn btn-sm" style="margin-top:8px" onclick="startWetDraw()">＋ 點選淋浴區（濕區）</button>`;
+  const L=wetLayout(),w=state.wet;if(!L)return'';
   const c=v=>Math.round(v)/10;
-  return`<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px"><span style="font-size:11px;font-weight:600;color:var(--accent)">濕區・淋浴間（${wetZoneType()}）</span><button class="btn btn-sm" onclick="showWetModal()">✎ 編輯</button></div>
-    <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">${w.tw} × ${w.th} <span style="font-size:11px;font-weight:400;color:var(--muted)">cm 裁長條</span></div>
-    <div class="info-tip" style="margin-top:2px">${L.z.isRect?'範圍':'外框'} ${c(L.z.x2-L.z.x1)} × ${c(L.z.y2-L.z.y1)} cm・第一條 ${c(L.first)} cm${L.n?`＋${L.n} 條 × ${c(L.each)} cm`:''}</div>`;
+  return tileItemHtml(TILE_DOT.wet,wetName(),`<div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)">${w.tw} × ${w.th} <span style="font-size:11px;font-weight:400;color:var(--muted)">cm（依尺寸裁長條）</span></div>
+    <div class="info-tip" style="margin-top:2px">淋浴區 ${wetZoneType()}・${L.z.isRect?'範圍':'外框'} ${c(L.z.x2-L.z.x1)} × ${c(L.z.y2-L.z.y1)} cm<br>第一條 ${c(L.first)} cm${L.n?`＋${L.n} 條 × ${c(L.each)} cm`:''}</div>`,
+    `<button class="icon-btn" title="編輯" onclick="showWetModal()">✎</button><button class="icon-btn" title="刪除濕區" onclick="delWet()">✕</button>`);
 }
 function wetBlockHtml(){
   const L=wetLayout(),w=state.wet;if(!L)return'';const c=v=>Math.round(v)/10;
@@ -3769,18 +3791,14 @@ function wetBlockHtml(){
     <div class="modal-spec"><div style="display:flex;align-items:center;gap:10px">${tileIconSvg(L.tw,L.th,null)}<div style="font-size:13px;font-weight:600;color:var(--text)">${c(L.tw)} × ${c(L.th)} cm　<span style="font-weight:400;color:var(--muted);font-size:11px">裁成長條</span></div></div></div>
     <div class="modal-note">${L.z.isRect?'範圍':'外框'} ${c(L.z.x2-L.z.x1)} × ${c(L.z.y2-L.z.y1)} cm；第一條 ${c(L.first)} cm${L.n?`，其餘 ${L.n} 條各 ${c(L.each)} cm`:''}；長條長 ${c(L.len)} cm${L.len>L.L?`（接縫${w.join==='stagger'?'交丁':'對齊'}）`:''}<br>${L.groups.map(g=>`${c(g.wd)} cm 寬 ${g.pieces} 段：一片可裁 ${g.per} 條，約 ${g.tiles} 片`).join('<br>')}${w.waste?`<br>已含 ${w.waste}% 損耗`:''}</div></div>`;
 }
-function showTileModal(kind){document.getElementById(kind==='wall'?'tileModalWall':'tileModalFloor').classList.remove('hidden');}
+function showTileModal(kind){const n=document.getElementById(kind==='wall'?'wallTileName':'floorTileName');if(n)n.value=tileName(kind);document.getElementById(kind==='wall'?'tileModalWall':'tileModalFloor').classList.remove('hidden');}
 function closeTileModal(){['tileModalFloor','tileModalWall'].forEach(id=>document.getElementById(id).classList.add('hidden'));refreshTileSummary();scheduleRender();}
 function renderTileTypes(){
   const el=document.getElementById('tileTypeList');if(!el)return;
-  el.innerHTML=(state.tileTypes||[]).map(t=>`<div class="obs-item" style="cursor:default">
-    <div class="obs-dot" style="background:${t.color}"></div>
-    <div class="obs-info"><div class="obs-name"><span style="font-family:var(--mono);color:var(--accent)">${t.code}</span>　${(t.name||'').replace(/</g,'&lt;')}</div>
-      <div class="obs-dim">${t.w}×${t.h} cm・縫 ${t.grout} mm・${LAYOUT_NAME[t.layout]||''}・損耗 ${t.waste||0}%</div></div>
-    <div class="item-actions">
-      <button class="item-btn edit" title="編輯" onclick="openTileTypeModal('${t.code}')">✎</button>
-      <button class="item-btn del" title="刪除" onclick="delTileType('${t.code}')">✕</button>
-    </div></div>`).join('')||'<div class="info-tip">尚未新增特殊磚。</div>';
+  el.innerHTML=(state.tileTypes||[]).map(t=>tileItemHtml(t.color,t.name||t.code,
+    `<div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)">${t.w} × ${t.h} <span style="font-size:11px;font-weight:400;color:var(--muted)">cm</span></div>
+     <div class="info-tip" style="margin-top:2px">縫 ${t.grout} mm　・　${LAYOUT_NAME[t.layout]||''}　・　損耗 ${t.waste||0}%<br>到壁磚圖上方「磚種」指定使用的牆面</div>`,
+    `<button class="icon-btn" title="編輯" onclick="openTileTypeModal('${t.code}')">✎</button><button class="icon-btn" title="刪除" onclick="delTileType('${t.code}')">✕</button>`)).join('');
 }
 let _ttEdit=null,_ttNew=false;
 function openTileTypeModal(code,isNew){
@@ -5766,7 +5784,7 @@ function projectData(){
       lShape:p.lShape,lCorner:p.lCorner,lCutW:p.lCutW,lCutH:p.lCutH,
       roomShape:document.getElementById('roomShape').value
     },
-    version2:{space:{steps:state.space.steps},wallOrgs:state.wallOrgs||{},floorOrg:state.floorOrg||null,tileTypes:state.tileTypes||[],faceTiles:state.faceTiles||{},wet:state.wet||null,spaceDone:!!state.spaceDone},
+    version2:{space:{steps:state.space.steps},wallOrgs:state.wallOrgs||{},floorOrg:state.floorOrg||null,tileTypes:state.tileTypes||[],faceTiles:state.faceTiles||{},wet:state.wet||null,tileNames:state.tileNames||{},spaceDone:!!state.spaceDone},
     obstacles:state.obstacles,
     stickers:state.stickers,
     procs:state.procs
@@ -5793,7 +5811,7 @@ function loadProjectData(data,undo){
   const v2=data.version2||{};
   const wasDone=!!state.spaceDone;
   state.space={steps:(v2.space&&v2.space.steps)||[]};
-  state.wallOrgs=v2.wallOrgs||{};state.floorOrg=v2.floorOrg||null;state.tileTypes=v2.tileTypes||[];state.faceTiles=v2.faceTiles||{};state.wet=v2.wet||null;renderTileTypes();
+  state.wallOrgs=v2.wallOrgs||{};state.floorOrg=v2.floorOrg||null;state.tileTypes=v2.tileTypes||[];state.faceTiles=v2.faceTiles||{};state.wet=v2.wet||null;state.tileNames=v2.tileNames||{};renderTileTypes();
   _space.key='';_space.model=null; // 重新建立空間，不做牆面換算
   state.obstacles=data.obstacles||[];
   state.stickers=data.stickers||[];
@@ -5979,17 +5997,17 @@ function showSummaryModal(){
   const faceName=id=>{const[k,a,b]=id.split(':');if(k==='seg'){const sg=getSeg(a);return sg?sg.tag:a;}return b==='deck'?'浴缸檯面':'半牆'+(TUB_EDGE_LBL[b]||'');};
   // 地磚
   {const spec={tileW:p.tileW,tileH:p.tileH},gp=groupPlan(floorPiecesAll().map(pc=>({face:'floor',pc})),spec,0);
-   cards.push(sumCard('地磚',spec,gp.full,gp.sources,ord(gp.full+gp.sources,p.waste),p.waste,gp.cut?`裁成 ${gp.cut} 片`:'',''));addFac(spec,gp,'地磚');}
+   cards.push(sumCard(`地磚｜${escH(tileName('floor'))}`,spec,gp.full,gp.sources,ord(gp.full+gp.sources,p.waste),p.waste,gp.cut?`裁成 ${gp.cut} 片`:'',''));addFac(spec,gp,tileName('floor'));}
   // 壁磚（各面合計）：窗側收邊直接併入（設定工廠背斜的窗改列工廠加工）
   {const g=G.main,spec={tileW:p.wallTileW,tileH:p.wallTileH},gp=g?g.plan:{full:0,sources:0,cut:0,bev:{cats:{}}},rv=RV.main;
    const rt=rv?rv.tiles:0,cut=gp.sources+rt;
-   cards.push(sumCard('壁磚（各面合計）',spec,gp.full,cut,ord(gp.full+cut,p.wallWaste),p.wallWaste,[gp.cut?`裁成 ${gp.cut} 片`:'',rt?`含窗側收邊 ${rt} 片（${rv.wins.length} 個窗，裁 ${rv.strips} 條）`:''].filter(Boolean).join('；'),''));
-   if(g)addFac(spec,gp,'壁磚');}
+   cards.push(sumCard(`壁磚（各面合計）｜${escH(tileName('wall'))}`,spec,gp.full,cut,ord(gp.full+cut,p.wallWaste),p.wallWaste,[gp.cut?`裁成 ${gp.cut} 片`:'',rt?`含窗側收邊 ${rt} 片（${rv.wins.length} 個窗，裁 ${rv.strips} 條）`:''].filter(Boolean).join('；'),''));
+   if(g)addFac(spec,gp,tileName('wall'));}
   // 特殊磚
   (state.tileTypes||[]).forEach(t=>{const g=G[t.code];if(!g)return;const sp=g.spec,rv=RV[t.code],rt=rv?rv.tiles:0,cut=g.plan.sources+rt;
-    cards.push(sumCard(`<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sp.color};margin-right:5px;vertical-align:-1px"></span>${t.code}・${sp.name}`,sp,g.plan.full,cut,ord(g.plan.full+cut,sp.waste),sp.waste,
+    cards.push(sumCard(`<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sp.color};margin-right:5px;vertical-align:-1px"></span>${escH(sp.name)}`,sp,g.plan.full,cut,ord(g.plan.full+cut,sp.waste),sp.waste,
       [g.plan.cut?`裁成 ${g.plan.cut} 片`:'',rt?`含窗側收邊 ${rt} 片`:''].filter(Boolean).join('；'),`使用面：${[...g.faces].map(faceName).join('、')}`));
-    addFac(sp,g.plan,t.code+' '+sp.name);});
+    addFac(sp,g.plan,sp.name);});
   // 嵌入式浴缸
   Object.entries(G).filter(([k])=>k.startsWith('T')).forEach(([k,g])=>{const sp=g.spec;
     cards.push(sumCard(`嵌入式浴缸 半牆＋檯面（${sp.name||''}，${g.faces.size} 面）`,sp,g.plan.full,g.plan.sources,ord(g.plan.full+g.plan.sources,sp.waste),sp.waste,g.plan.cut?`裁成 ${g.plan.cut} 片`:'',`未併入${sp.name||'同規格'}數量，同規格請相加叫貨`));
@@ -5999,7 +6017,7 @@ function showSummaryModal(){
     const cl={};L.segs.forEach(sg=>{const k=c(sg.wd)+'|'+c(sg.len)+(sg.irr?'|異形':'');cl[k]=(cl[k]||0)+1;});
     const list=Object.entries(cl).sort((a,b)=>parseFloat(b[0])-parseFloat(a[0])||parseFloat(b[0].split('|')[1])-parseFloat(a[0].split('|')[1])).map(([k,n])=>{const[wd,ln,irr]=k.split('|');
       return`<div style="display:flex;align-items:center;gap:8px;padding:3px 0">${tileIconSvg(+ln*10,+wd*10,null)}<span style="flex:1;font-size:12px;color:#1A1916">${wd} × ${ln} cm${irr?' <span style="color:var(--warn)">（異形，依現場）</span>':''}</span><span style="font-family:var(--mono);font-size:14px;color:#1A1916">${n}</span><span style="font-size:11px;color:var(--muted)">片</span></div>`;}).join('');
-    cards.push(sumCard(`淋浴間（濕區・${wetZoneType()}）`,null,0,L.tiles,L.order,w.waste,`以 ${c(L.tw)}×${c(L.th)} cm 整磚估算用量；共 ${L.segs.length} 片長條`,
+    cards.push(sumCard(`淋浴間｜${escH(wetName())}（${wetZoneType()}）`,null,0,L.tiles,L.order,w.waste,`以 ${c(L.tw)}×${c(L.th)} cm 整磚估算用量；共 ${L.segs.length} 片長條`,
       `<div style="font-weight:600;color:var(--accent);margin:2px 0 4px">下單尺寸（請工廠依尺寸裁好）</div>${list}`));}}
   document.getElementById('sumBasic').innerHTML=cards.join('');
   // 工廠加工
