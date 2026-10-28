@@ -131,10 +131,11 @@ canvas{display:block}
 .hist-btn{font-size:15px;line-height:1;padding:4px 9px}.hist-btn:disabled{opacity:.35;cursor:default}
 .icon-btn{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:5px;background:#fff;cursor:pointer;font-size:12px;color:var(--text);padding:0}
 .icon-btn:hover{background:var(--accent-l);border-color:var(--accent)}
-.tile-item{padding:8px 0;border-bottom:1px dashed var(--border)}.tile-item:last-child{border-bottom:none}
-.tile-item-h{display:flex;align-items:center;gap:6px;margin-bottom:3px}
-.tile-dot{width:9px;height:9px;border-radius:50%;border:1px solid rgba(0,0,0,.25);flex:none}
-.tile-name{flex:1;font-size:12px;font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--border);font-size:12px}.tile-item:last-child{border-bottom:none}
+.tile-ic{width:40px;display:flex;align-items:center;justify-content:center;flex:none}
+.tile-item .obs-name{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.tile-item .obs-name b{font-weight:500}.tile-item .obs-name span{font-family:var(--mono);font-size:11px;color:var(--text)}
+.tile-item .item-actions{display:flex;gap:4px}
 .sb-body{padding:13px;padding-top:8px}
 .sb-body.hidden{display:none}
 /* Category group labels */
@@ -3675,15 +3676,23 @@ const TILE_DOT={floor:'#E8E4DC',wall:'#EFE6CF',wet:'#C9DDE8'};
 function tileName(k){const n=(state.tileNames||{})[k];return n&&n.trim()?n:(k==='floor'?'乾區地磚A':'壁磚A');}
 function wetName(){return state.wet&&state.wet.name&&state.wet.name.trim()?state.wet.name:'濕區地磚B';}
 const escH=t=>String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
-function tileItemHtml(dot,name,body,actions){
-  return`<div class="tile-item"><div class="tile-item-h"><span class="tile-dot" style="background:${dot}"></span><span class="tile-name" title="${escH(name)}">${escH(name)}</span>${actions||''}</div>${body}</div>`;
+// 側欄一列：同比例的磚尺寸圖示＋名稱與尺寸同一行＋細項
+const SIDE_K=0.03; // 120cm＝36px
+function sideTileIcon(wmm,hmm,color){
+  const k=Math.min(SIDE_K,38/Math.max(wmm,hmm)),w=Math.max(6,wmm*k),h=Math.max(6,hmm*k);
+  return`<svg width="${w+2}" height="${h+2}" viewBox="0 0 ${w+2} ${h+2}"><rect x="1" y="1" width="${w}" height="${h}" fill="${color}" stroke="#8A8780" stroke-width="1"/></svg>`;
+}
+function tileItemHtml(color,wmm,hmm,name,size,dim,actions){
+  return`<div class="tile-item"><div class="tile-ic">${sideTileIcon(wmm,hmm,color)}</div>
+    <div class="obs-info" style="min-width:0"><div class="obs-name"><b>${escH(name)}</b><span>${size}</span></div><div class="obs-dim">${dim}</div></div>
+    ${actions?`<div class="item-actions">${actions}</div>`:''}</div>`;
 }
 function toggleTileSb(id){const b=document.getElementById(id),c=document.getElementById('chevron'+id);if(!b)return;const hid=b.classList.toggle('hidden');if(c)c.classList.toggle('open',!hid);}
 function refreshTileSummary(){
   const f=document.getElementById('floorTileSummary'),w=document.getElementById('wallTileSummary');if(!f||!w)return;
-  const p=_Praw();
-  f.innerHTML=tileItemHtml(TILE_DOT.floor,tileName('floor'),tileSummaryHtml(p.tileW/10,p.tileH/10,p.grout,p.layout,p.waste))+(state.spaceDone?wetSideHtml():'');
-  w.innerHTML=tileItemHtml(TILE_DOT.wall,tileName('wall'),tileSummaryHtml(p.wallTileW/10,p.wallTileH/10,p.wallGrout,p.wallLayout,p.wallWaste));
+  const p=_Praw(),dim=(g,lay,ws)=>`縫 ${g} mm・${LAYOUT_NAME[lay]||lay}・損耗 ${ws}%`;
+  f.innerHTML=tileItemHtml(TILE_DOT.floor,p.tileW,p.tileH,tileName('floor'),`${p.tileW/10} × ${p.tileH/10} cm`,dim(p.grout,p.layout,p.waste))+(state.spaceDone?wetSideHtml():'');
+  w.innerHTML=tileItemHtml(TILE_DOT.wall,p.wallTileW,p.wallTileH,tileName('wall'),`${p.wallTileW/10} × ${p.wallTileH/10} cm`,dim(p.wallGrout,p.wallLayout,p.wallWaste));
   const ab=document.getElementById('floorAddBtn');if(ab)ab.style.display=state.wet?'none':'';
 }
 // ---- 淋浴區 UI ----
@@ -3776,8 +3785,8 @@ function delWet(){state.wet=null;closeWetModal();}
 function wetSideHtml(){
   const L=wetLayout(),w=state.wet;if(!L)return'';
   const c=v=>Math.round(v)/10;
-  return tileItemHtml(TILE_DOT.wet,wetName(),`<div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)">${w.tw} × ${w.th} <span style="font-size:11px;font-weight:400;color:var(--muted)">cm（依尺寸裁長條）</span></div>
-    <div class="info-tip" style="margin-top:2px">淋浴區 ${wetZoneType()}・${L.z.isRect?'範圍':'外框'} ${c(L.z.x2-L.z.x1)} × ${c(L.z.y2-L.z.y1)} cm<br>第一條 ${c(L.first)} cm${L.n?`＋${L.n} 條 × ${c(L.each)} cm`:''}</div>`,
+  return tileItemHtml(TILE_DOT.wet,L.tw,L.th,wetName(),`${w.tw} × ${w.th} cm`,
+    `依尺寸裁長條・${wetZoneType()}<br>第一條 ${c(L.first)} cm${L.n?`＋${L.n} 條 × ${c(L.each)} cm`:''}`,
     `<button class="icon-btn" title="編輯" onclick="showWetModal()">✎</button><button class="icon-btn" title="刪除濕區" onclick="delWet()">✕</button>`);
 }
 function wetBlockHtml(){
@@ -3795,9 +3804,8 @@ function showTileModal(kind){const n=document.getElementById(kind==='wall'?'wall
 function closeTileModal(){['tileModalFloor','tileModalWall'].forEach(id=>document.getElementById(id).classList.add('hidden'));refreshTileSummary();scheduleRender();}
 function renderTileTypes(){
   const el=document.getElementById('tileTypeList');if(!el)return;
-  el.innerHTML=(state.tileTypes||[]).map(t=>tileItemHtml(t.color,t.name||t.code,
-    `<div style="font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)">${t.w} × ${t.h} <span style="font-size:11px;font-weight:400;color:var(--muted)">cm</span></div>
-     <div class="info-tip" style="margin-top:2px">縫 ${t.grout} mm　・　${LAYOUT_NAME[t.layout]||''}　・　損耗 ${t.waste||0}%<br>到壁磚圖上方「磚種」指定使用的牆面</div>`,
+  el.innerHTML=(state.tileTypes||[]).map(t=>tileItemHtml(t.color,(+t.w||60)*10,(+t.h||60)*10,t.name||t.code,`${t.w} × ${t.h} cm`,
+    `縫 ${t.grout} mm・${LAYOUT_NAME[t.layout]||''}・損耗 ${t.waste||0}%`,
     `<button class="icon-btn" title="編輯" onclick="openTileTypeModal('${t.code}')">✎</button><button class="icon-btn" title="刪除" onclick="delTileType('${t.code}')">✕</button>`)).join('');
 }
 let _ttEdit=null,_ttNew=false;
