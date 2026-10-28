@@ -154,7 +154,8 @@ canvas{display:block}
 .modal-spec{font-size:11px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:16px;line-height:1.8;font-family:var(--mono)}
 .modal-btns{display:flex;gap:8px;justify-content:flex-end}
 #summaryModal .modal{max-width:1200px;width:94vw;max-height:90vh;overflow:auto}
-.sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:6px}
+.sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:6px;align-items:start}
+.sum-stack{display:flex;flex-direction:column;gap:14px;min-width:0}
 .sum-col{border:1px solid var(--border);border-radius:8px;padding:12px;background:#fff}
 .sum-col>div:first-child,.sum-col>div:nth-child(1){margin-top:0!important}
 .sum-sec{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.08em;margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
@@ -170,7 +171,8 @@ canvas{display:block}
 .sum-sub{font-size:10.5px;color:var(--muted);padding:2px 2px 0}
 .sum-order{flex-direction:column;align-items:center;justify-content:center;min-width:88px;text-align:center}
 .sum-order .sum-l{flex:none}.sum-order .sum-v{color:var(--warn);font-size:30px;margin:4px 0}
-.fac-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;margin-bottom:6px}
+.fac-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}.fac-grid>.info-tip{grid-column:1/-1}
+.fac-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:#fff}
 .fac-name{flex:1;font-size:12.5px;font-weight:600;color:#1A1916}.fac-area{font-size:10.5px;font-weight:400;color:var(--muted);margin-top:2px}
 .fac-n{font-family:var(--mono);font-size:22px;color:#1A1916}.fac-n span{font-size:11px;color:var(--muted);margin-left:3px;font-family:var(--sans)}
 .sum-col .modal-stats{grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
@@ -293,10 +295,10 @@ canvas{display:block}
       <span class="sb-header-title">壁磚設定</span>
       <span style="display:flex;align-items:center;gap:4px">
         <button class="icon-btn" title="新增壁磚（腰帶、主題牆等）" onclick="event.stopPropagation();addTileType()">＋</button>
-        <span class="sb-chevron open" id="chevronsbWallTile" style="margin-left:4px">▼</span>
+        <span class="sb-chevron" id="chevronsbWallTile" style="margin-left:4px">▼</span>
       </span>
     </div>
-    <div class="sb-body" id="sbWallTile"><div id="wallTileSummary"></div><div id="tileTypeList"></div></div>
+    <div class="sb-body hidden" id="sbWallTile"><div id="wallTileSummary"></div><div id="tileTypeList"></div></div>
   </div>
 
   <div class="sb-group-label">圖面標示</div>
@@ -459,10 +461,13 @@ canvas{display:block}
   <div class="sb-collapsible">
     <div class="sb-header" onclick="toggleSb('sbProc')">
       <span class="sb-header-title">加工標記</span>
-      <span class="sb-chevron" id="chevronsbProc">▼</span>
+      <span style="display:flex;align-items:center;gap:4px">
+        <button class="icon-btn" title="到 3D 圖標記加工" onclick="event.stopPropagation();goProc3D()">＋</button>
+        <span class="sb-chevron" id="chevronsbProc" style="margin-left:4px">▼</span>
+      </span>
     </div>
     <div class="sb-body hidden" id="sbProc">
-    <div class="info-tip" style="margin-bottom:7px">在地磚圖、壁磚圖或 3D 圖按「加工標記」，滑鼠移到磚邊會先預覽，點擊標記；同種類再點一次可取消。3D 中拖曳空白處仍可旋轉。</div>
+    <div class="info-tip" style="margin-bottom:7px">按 ＋ 或 3D 圖的「加工標記」，滑鼠移到磚邊（含窗洞側面）會先預覽，點擊標記；同種類再點一次可取消。3D 中拖曳空白處仍可旋轉。</div>
     <div class="tag-row" id="procTypeTags" style="margin-bottom:8px">
       <span class="tag active" data-proc="工廠背斜" onclick="selProcType(this,'工廠背斜')">工廠背斜</span>
       <span class="tag" data-proc="現場導角" onclick="selProcType(this,'現場導角')">現場導角</span>
@@ -493,8 +498,8 @@ canvas{display:block}
     <div id="mConflicts"></div>
     <div class="sum-sec">基本計算</div>
     <div class="sum-grid" id="sumBasic"></div>
-    <div class="sum-sec">工廠加工 <span style="font-weight:400;color:var(--muted);letter-spacing:0">（另向工廠叫貨，未計入上方建議叫貨）</span></div>
-    <div id="sumFactory"></div>
+    <div class="sum-sec">工廠加工 <span style="font-weight:400;color:var(--muted);letter-spacing:0">（未計入上方建議叫貨）</span></div>
+    <div id="sumFactory" class="fac-grid"></div>
     <div class="modal-btns">
       <button class="btn btn-sm" onclick="exportSummaryJPG()">另存 JPG</button>
       <button class="btn btn-sm btn-p" onclick="closeSummaryModal()">關閉</button>
@@ -1472,7 +1477,7 @@ function updateWallFaceLbl(){
   if(el)el.textContent=(fs[state.wallFace%fs.length]||fs[0]).label;
 }
 
-const ALL_SB_IDS=['sbRoom','sbObs','sbSticker','sbProc'];
+const ALL_SB_IDS=['sbRoom','sbTile','sbWallTile','sbObs','sbSticker','sbProc'];
 function toggleSb(id){
   const isHidden=document.getElementById(id).classList.contains('hidden');
   // 收合全部
@@ -2497,13 +2502,13 @@ function renderStickerList(){
 // proc：{type, face:'floor'|'seg:KEY'|'tub:ID:EDGE', x1,y1,x2,y2（面內 mm）}；舊資料沒有 face＝地板
 const procFace=pr=>pr.face||'floor';
 function floorPiecesAll(){return floorAll().all;}
-function facePiecesAny(face){return face==='floor'?floorPiecesAll():facePieces(face);}
+function facePiecesAny(face){return face==='floor'?floorPiecesAll():String(face).startsWith('rev:')?revPieces(face):facePieces(face);}
 // 某一面的開口／排除區（門窗、浴缸、淋浴區等），快取到這一輪執行結束
 const _exclCache=new Map();
 function faceExcl(face){
   if(_exclCache.has(face))return _exclCache.get(face);
   if(!_exclCache.size)Promise.resolve().then(()=>_exclCache.clear());
-  const ex=face==='floor'?floorExclusions(P(),innerDim()):((faceBase(face)||{}).excl||[]);
+  const ex=face==='floor'?floorExclusions(P(),innerDim()):String(face).startsWith('rev:')?[]:((faceBase(face)||{}).excl||[]);
   _exclCache.set(face,ex);return ex;
 }
 // 一片磚實際露出的邊：磚的外框扣掉被開口蓋住的部分，再加上開口（窗、門、浴缸…）在這片磚內的邊
@@ -2573,6 +2578,7 @@ function drawFaceProcs(face,X,Y,PXv){
 }
 const sameEdge=(a,b)=>Math.abs(a.x1-b.x1)<1&&Math.abs(a.y1-b.y1)<1&&Math.abs(a.x2-b.x2)<1&&Math.abs(a.y2-b.y2)<1;
 function selProcType(el,type){document.querySelectorAll('#procTypeTags .tag').forEach(t=>t.classList.remove('active'));el.classList.add('active');state.procType=type;}
+function goProc3D(){if(!state.spaceDone)return;if(state.view!=='unfold')setView('unfold');setMode('proc');const b=document.getElementById('sbProc');if(b&&b.classList.contains('hidden'))toggleSb('sbProc');}
 function clearProcs(){state.procs=[];renderProcList();scheduleRender();}
 function renderProcList(){
   const el=document.getElementById('procList');
@@ -3867,7 +3873,7 @@ function tileItemHtml(color,wmm,hmm,name,size,dim,actions){
     <div class="obs-info" style="min-width:0"><div class="obs-name"><b>${escH(name)}</b><span>${size}</span></div><div class="obs-dim">${dim}</div></div>
     ${actions?`<div class="item-actions">${actions}</div>`:''}</div>`;
 }
-function toggleTileSb(id){const b=document.getElementById(id),c=document.getElementById('chevron'+id);if(!b)return;const hid=b.classList.toggle('hidden');if(c)c.classList.toggle('open',!hid);}
+function toggleTileSb(id){toggleSb(id);}
 function refreshTileSummary(){
   const f=document.getElementById('floorTileSummary'),w=document.getElementById('wallTileSummary');if(!f||!w)return;
   const p=_Praw(),dim=(g,lay,ws)=>`縫 ${g} mm・${LAYOUT_NAME[lay]||lay}・損耗 ${ws}%`;
@@ -5111,7 +5117,7 @@ function build3D(){
   const key=[p.roomW,p.roomH,p.wallT,p.wallH,document.getElementById('roomShape').value,p.lCorner].join(',');
   if(!V3.target||V3.keyRoom!==key){V3.keyRoom=key;reset3DView();}
   if(V3.root){V3.scene.remove(V3.root);dispose3D(V3.root);}
-  const root=new THREE.Group();V3.root=root;V3.scene.add(root);V3.walls=[];V3.attached=[];V3.cornerBlocks=[];
+  const root=new THREE.Group();V3.root=root;V3.scene.add(root);V3.walls=[];V3.revMeshes=[];V3.attached=[];V3.cornerBlocks=[];
   const wallTP={tileW:p.wallTileW,tileH:p.wallTileH,grout:p.wallGrout,layout:p.wallLayout};
   state._wallNums=wallNumbering();
 
@@ -5604,8 +5610,31 @@ function addWallThickness3D(root,sm,p,H){
     });
   });
 }
+// ---- 窗洞側面（收邊條）當作可標加工的面：face＝rev:牆KEY:窗ID:top|bot|left|right ----
+// 面內座標＝貼圖座標：上 x 沿窗寬、y＝離牆面深度；下 y＝D−深度；左 x＝深度；右 x＝D−深度；左右 y 從窗頂往下
+function revInfo(face){
+  const[k,key,oid,side]=String(face).split(':');if(k!=='rev')return null;const id='seg:'+key,base=faceBase(id);if(!base)return null;
+  const e=base.excl.find(x=>x.type==='window'&&String(x.id)===oid&&x.rev>0);if(!e)return null;
+  const zs=faceZones(id,base),cy=(e.y1+e.y2)/2,z=zs.find(z=>cy>=z.y0&&cy<=z.y1)||zs[0];
+  const spec=z?z.spec:{tileW:P().wallTileW,tileH:P().wallTileH,grout:P().wallGrout};
+  const horiz=side==='top'||side==='bot';
+  return{key,e,side,spec,horiz,len:horiz?e.x2-e.x1:e.y2-e.y1,D:e.rev,cuts:revealCuts(id,e,spec)[side]||[]};
+}
+function revPieces(face){
+  const r=revInfo(face);if(!r)return[];const out=[];let a=0;
+  r.cuts.concat([r.len]).forEach(t=>{if(t-a>0.5)out.push(r.horiz?{x:a,y:0,cw:t-a,ch:r.D,isPartial:true,spec:r.spec,ex:[]}:{x:0,y:a,cw:r.D,ch:t-a,isPartial:true,spec:r.spec,ex:[]});a=t;});
+  return out;
+}
+function revFaceIds(){
+  const out=[];wallSegs(P(),innerDim()).forEach(sg=>{const b=faceBase('seg:'+sg.key);if(!b)return;
+    b.excl.filter(e=>e.type==='window'&&e.rev>0).forEach(e=>['top','bot','left','right'].forEach(sd=>out.push(`rev:${sg.key}:${e.id}:${sd}`)));});
+  return out;
+}
+// 貼圖座標 ↔ 牆面座標（X 沿牆、Y 從牆頂往下、dep 離牆面深度，mm）
+function revToWall(r,x,y){const e=r.e;return r.side==='top'?{X:e.x1+x,Y:e.y1,dep:y}:r.side==='bot'?{X:e.x1+x,Y:e.y2,dep:r.D-y}:r.side==='left'?{X:e.x1,Y:e.y1+y,dep:x}:{X:e.x2,Y:e.y1+y,dep:r.D-x};}
+function revFromWall(r,X,Y,dep){const e=r.e;return r.side==='top'?{x:X-e.x1,y:dep}:r.side==='bot'?{x:X-e.x1,y:r.D-dep}:r.side==='left'?{x:dep,y:Y-e.y1}:{x:r.D-dep,y:Y-e.y1};}
 // ---- 3D：窗洞收邊（窗框內退，四周側面貼磚，窗在內退處）----
-function revealStripTex(lenmm,Dmm,vertical,spec,cuts){
+function revealStripTex(lenmm,Dmm,vertical,spec,cuts,face){
   const w=vertical?Dmm:lenmm,h=vertical?lenmm:Dmm;
   return offscreenSurface(w,h,s=>{
     ctx.fillStyle=tileFill(true,spec&&spec.color);ctx.fillRect(0,0,w*s,h*s);
@@ -5613,6 +5642,7 @@ function revealStripTex(lenmm,Dmm,vertical,spec,cuts){
     ctx.strokeStyle='#A8A296';ctx.lineWidth=Math.max(1,g*s,1.5);
     ctx.strokeRect(0,0,w*s,h*s);
     (cuts||[]).forEach(t=>{ctx.beginPath();if(vertical){ctx.moveTo(0,t*s);ctx.lineTo(w*s,t*s);}else{ctx.moveTo(t*s,0);ctx.lineTo(t*s,h*s);}ctx.stroke();});
+    if(face)drawFaceProcs(face,0,0,s);
   });
 }
 function addWindowReveals3D(mesh,seg,ex,H){
@@ -5621,14 +5651,15 @@ function addWindowReveals3D(mesh,seg,ex,H){
     const cy=(e.y1+e.y2)/2,z=zs.find(z=>cy>=z.y0&&cy<=z.y1)||zs[0];const spec=z?z.spec:{tileW:P().wallTileW,tileH:P().wallTileH,grout:P().wallGrout};
     const wmm=e.x2-e.x1,hmm=e.y2-e.y1,D=e.rev/10,w=wmm/10,h=hmm/10;
     const X1=e.x1/10,X2=e.x2/10,Yt=H-e.y1/10,Yb=H-e.y2/10;
-    const mk=(geo,cv,pos)=>{const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:texFrom(cv),side:THREE.DoubleSide}));m.position.set(...pos);m.add(edgeLines(geo,0x6E6A62,0.9));mesh.add(m);};
+    const mk=(geo,cv,pos,rf)=>{const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:texFrom(cv),side:THREE.DoubleSide}));m.position.set(...pos);m.add(edgeLines(geo,0x6E6A62,0.9));mesh.add(m);if(rf)(V3.revMeshes=V3.revMeshes||[]).push({m,face:rf,wall:mesh});};
+    const rf=sd=>`rev:${seg.key}:${e.id}:${sd}`;
     const ct=revealCuts(id,e,spec);
     // 上（窗楣）、下（窗台）：寬 w、深 D
-    const top=new THREE.PlaneGeometry(w,D);top.rotateX(Math.PI/2);mk(top,revealStripTex(wmm,e.rev,false,spec,ct.top),[X1+w/2,Yt,-D/2]);
-    const bot=new THREE.PlaneGeometry(w,D);bot.rotateX(-Math.PI/2);mk(bot,revealStripTex(wmm,e.rev,false,spec,ct.bot),[X1+w/2,Yb,-D/2]);
+    const top=new THREE.PlaneGeometry(w,D);top.rotateX(Math.PI/2);mk(top,revealStripTex(wmm,e.rev,false,spec,ct.top,rf('top')),[X1+w/2,Yt,-D/2],rf('top'));
+    const bot=new THREE.PlaneGeometry(w,D);bot.rotateX(-Math.PI/2);mk(bot,revealStripTex(wmm,e.rev,false,spec,ct.bot,rf('bot')),[X1+w/2,Yb,-D/2],rf('bot'));
     // 左右側：深 D、高 h
-    const l=new THREE.PlaneGeometry(D,h);l.rotateY(Math.PI/2);mk(l,revealStripTex(hmm,e.rev,true,spec,ct.left),[X1,Yb+h/2,-D/2]);
-    const r=new THREE.PlaneGeometry(D,h);r.rotateY(-Math.PI/2);mk(r,revealStripTex(hmm,e.rev,true,spec,ct.right),[X2,Yb+h/2,-D/2]);
+    const l=new THREE.PlaneGeometry(D,h);l.rotateY(Math.PI/2);mk(l,revealStripTex(hmm,e.rev,true,spec,ct.left,rf('left')),[X1,Yb+h/2,-D/2],rf('left'));
+    const r=new THREE.PlaneGeometry(D,h);r.rotateY(-Math.PI/2);mk(r,revealStripTex(hmm,e.rev,true,spec,ct.right,rf('right')),[X2,Yb+h/2,-D/2],rf('right'));
     // 窗：在內退深度處
     const wcv=offscreenSurface(wmm,hmm,s=>{drawWindowElev(0,0,wmm*s,hmm*s,s);});
     const wg=new THREE.PlaneGeometry(w,h);mk(wg,wcv,[X1+w/2,Yb+h/2,-D]);
@@ -5683,7 +5714,10 @@ function proc3DAt(e){
   setRay(e);V3.scene.updateMatrixWorld();
   const p=P(),H=p.wallH,cands=[];
   {const ms=V3.walls.filter(w=>w.mesh.visible).map(w=>w.mesh),h=_ray.intersectObjects(ms,false)[0];
-   if(h){const w=V3.walls.find(w=>w.mesh===h.object),lp=h.object.worldToLocal(h.point.clone());cands.push({dist:h.distance,face:'seg:'+w.key,x:lp.x*10,y:(H-lp.y)*10});}}
+   if(h){const w=V3.walls.find(w=>w.mesh===h.object),lp=h.object.worldToLocal(h.point.clone()),x=lp.x*10,y=(H-lp.y)*10;
+     // 點在有內退的窗洞裡：打到的是窗洞側面，不算牆面
+     const inWin=((faceBase('seg:'+w.key)||{}).excl||[]).some(e=>e.type==='window'&&e.rev>0&&x>e.x1+1&&x<e.x2-1&&y>e.y1+1&&y<e.y2-1);
+     if(!inWin)cands.push({dist:h.distance,face:'seg:'+w.key,x,y});}}
   state.stickers.filter(s=>s.type==='bathtub'&&!s._placing).forEach(s=>{
     const rec=V3.items&&V3.items.get('stk:'+s.id);if(!rec||!worldVisible(rec.obj))return;
     const h=_ray.intersectObjects([rec.obj],true)[0];if(!h)return;
@@ -5695,8 +5729,11 @@ function proc3DAt(e){
     cands.push({dist:h.distance,face:'tub:'+s.id+':'+eg,x:fx,y:(Ht-pt.y)*10});
   });
   {const pt=floorHit(e);if(pt){const d=innerDim(),x=pt.x*10,y=pt.z*10;if(x>=0&&y>=0&&x<=d.iw*10&&y<=d.ih*10)cands.push({dist:V3.camera.position.distanceTo(pt),face:'floor',x,y});}}
+  {const rv=(V3.revMeshes||[]).filter(r=>worldVisible(r.m)),h=_ray.intersectObjects(rv.map(r=>r.m),false)[0];
+   if(h){const it=rv.find(r=>r.m===h.object),ri=revInfo(it.face);if(ri){const lp=it.wall.worldToLocal(h.point.clone()),c=revFromWall(ri,lp.x*10,(H-lp.y)*10,-lp.z*10);
+     cands.push({dist:h.distance-0.01,face:it.face,x:c.x,y:c.y,small:true});}}}
   cands.sort((a,b)=>a.dist-b.dist);const c=cands[0];if(!c)return null;
-  const tol=Math.max(20,c.dist*10*0.02);
+  const tol=c.small?Math.max(8,Math.min(30,c.dist*10*0.012)):Math.max(20,c.dist*10*0.02);
   const ed=edgeNear(facePiecesAny(c.face),c.x,c.y,tol,faceExcl(c.face));
   return ed?{face:c.face,e:ed}:null;
 }
@@ -5706,6 +5743,9 @@ function faceToWorld(face,x,y,lift){
   if(face==='floor')return new THREE.Vector3(x/10,lift,y/10);
   const [k,a,b]=face.split(':');
   if(k==='seg'){const w=V3.walls.find(w=>w.key===a);if(!w)return null;return new THREE.Vector3(x/10,H-y/10,lift).applyMatrix4(w.mesh.matrixWorld);}
+  if(k==='rev'){const r=revInfo(face),w=V3.walls.find(w=>w.key===a);if(!r||!w)return null;const q=revToWall(r,x,y);let lx=q.X/10,ly=H-q.Y/10;
+    if(r.side==='top')ly-=lift;else if(r.side==='bot')ly+=lift;else if(r.side==='left')lx+=lift;else lx-=lift;
+    return new THREE.Vector3(lx,ly,-q.dep/10).applyMatrix4(w.mesh.matrixWorld);}
   const s=state.stickers.find(t=>String(t.id)===a);if(!s)return null;
   const r=stkFootprint(s),cx=(r.x1+r.x2)/20,cz=(r.y1+r.y2)/20,W=(r.x2-r.x1)/10,D=(r.y2-r.y1)/10,Ht=stkHeight(s),O=lift;
   if(b==='deck')return new THREE.Vector3(cx+x/10-W/2,Ht+O,cz+y/10-D/2);
@@ -6348,7 +6388,7 @@ function sumCard(title,spec,full,cut,order,waste,sub,note){
 }
 function showSummaryModal(){
   if(state.view!=='floor'){renderFloorView();if(state.view==='wall')renderWallView();}
-  const p=P(),G=tileGroupStats(),RV=revealStats(),fac=[],cards=[];
+  const p=P(),G=tileGroupStats(),RV=revealStats(),fac=[],cF=[],cW=[],cT=[];
   const ord=(n,w)=>Math.ceil(n*(1+(w||0)/100));
   const addFac=(spec,plan,area)=>Object.entries(plan.bev.cats).forEach(([cat,n])=>{
     const k=spec.tileW+'x'+spec.tileH+'|'+cat,e=fac.find(f=>f.k===k);if(e){e.n+=n;e.areas.add(area);}else fac.push({k,spec,cat,n,areas:new Set([area])});});
@@ -6356,39 +6396,41 @@ function showSummaryModal(){
   // 地磚：主地磚＋一般分區的磚種
   const FA=floorAll();
   {const spec={tileW:p.tileW,tileH:p.tileH,color:mainColor('floor')},gp=groupPlan((FA.G.main||{items:[]}).items,spec,0);
-   cards.push(sumCard(`地磚｜${escH(tileName('floor'))}`,spec,gp.full,gp.sources,ord(gp.full+gp.sources,p.waste),p.waste,gp.cut?`裁成 ${gp.cut} 片`:'',''));addFac(spec,gp,tileName('floor'));}
+   cF.push(sumCard(`地磚｜${escH(tileName('floor'))}`,spec,gp.full,gp.sources,ord(gp.full+gp.sources,p.waste),p.waste,gp.cut?`裁成 ${gp.cut} 片`:'',''));addFac(spec,gp,tileName('floor'));}
   Object.entries(FA.G).filter(([k])=>k!=='main').forEach(([k,g])=>{const sp=g.spec,gp=groupPlan(g.items,sp,0);
-   cards.push(sumCard(`地磚｜${escH(sp.name)}`,sp,gp.full,gp.sources,ord(gp.full+gp.sources,sp.waste),sp.waste,gp.cut?`裁成 ${gp.cut} 片`:'',`使用區域：${FA.zl.filter(r=>r.spec.code===k).map(r=>escH(r.z.name||'區域')).join('、')}`));addFac(sp,gp,sp.name);});
+   cF.push(sumCard(`地磚｜${escH(sp.name)}`,sp,gp.full,gp.sources,ord(gp.full+gp.sources,sp.waste),sp.waste,gp.cut?`裁成 ${gp.cut} 片`:'',`使用區域：${FA.zl.filter(r=>r.spec.code===k).map(r=>escH(r.z.name||'區域')).join('、')}`));addFac(sp,gp,sp.name);});
   // 壁磚（各面合計）：窗側收邊直接併入（設定工廠背斜的窗改列工廠加工）
   {const g=G.main,spec={tileW:p.wallTileW,tileH:p.wallTileH,color:mainColor('wall')},gp=g?g.plan:{full:0,sources:0,cut:0,bev:{cats:{}}},rv=RV.main;
    const rt=rv?rv.tiles:0,cut=gp.sources+rt;
-   cards.push(sumCard(`壁磚（各面合計）｜${escH(tileName('wall'))}`,spec,gp.full,cut,ord(gp.full+cut,p.wallWaste),p.wallWaste,[gp.cut?`裁成 ${gp.cut} 片`:'',rt?`含窗側收邊 ${rt} 片（${rv.wins.length} 個窗，裁 ${rv.strips} 條）`:''].filter(Boolean).join('；'),''));
+   cW.push(sumCard(`壁磚（各面合計）｜${escH(tileName('wall'))}`,spec,gp.full,cut,ord(gp.full+cut,p.wallWaste),p.wallWaste,[gp.cut?`裁成 ${gp.cut} 片`:'',rt?`含窗側收邊 ${rt} 片（${rv.wins.length} 個窗，裁 ${rv.strips} 條）`:''].filter(Boolean).join('；'),''));
    if(g)addFac(spec,gp,tileName('wall'));}
   // 特殊磚
   (state.tileTypes||[]).forEach(t=>{const g=G[t.code];if(!g)return;const sp=g.spec,rv=RV[t.code],rt=rv?rv.tiles:0,cut=g.plan.sources+rt;
-    cards.push(sumCard(`<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sp.color};margin-right:5px;vertical-align:-1px"></span>${escH(sp.name)}`,sp,g.plan.full,cut,ord(g.plan.full+cut,sp.waste),sp.waste,
+    cW.push(sumCard(`<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sp.color};margin-right:5px;vertical-align:-1px"></span>${escH(sp.name)}`,sp,g.plan.full,cut,ord(g.plan.full+cut,sp.waste),sp.waste,
       [g.plan.cut?`裁成 ${g.plan.cut} 片`:'',rt?`含窗側收邊 ${rt} 片`:''].filter(Boolean).join('；'),`使用面：${[...g.faces].map(faceName).join('、')}`));
     addFac(sp,g.plan,sp.name);});
   // 嵌入式浴缸
   Object.entries(G).filter(([k])=>k.startsWith('T')).forEach(([k,g])=>{const sp=g.spec;
-    cards.push(sumCard(`嵌入式浴缸 半牆＋檯面（${sp.name||''}，${g.faces.size} 面）`,sp,g.plan.full,g.plan.sources,ord(g.plan.full+g.plan.sources,sp.waste),sp.waste,g.plan.cut?`裁成 ${g.plan.cut} 片`:'',`未併入${sp.name||'同規格'}數量，同規格請相加叫貨`));
+    cT.push(sumCard(`嵌入式浴缸 半牆＋檯面（${sp.name||''}，${g.faces.size} 面）`,sp,g.plan.full,g.plan.sources,ord(g.plan.full+g.plan.sources,sp.waste),sp.waste,g.plan.cut?`裁成 ${g.plan.cut} 片`:'',`未併入${sp.name||'同規格'}數量，同規格請相加叫貨`));
     addFac(sp,g.plan,'嵌入式浴缸');});
   // 淋浴間（長條分區）
   FA.zl.forEach((zr,zi)=>{if(!zr.strip)return;const L=stripLayout(zr,FA.zl.slice(zi+1).flatMap(r=>r.rects)),w=zr.z,c=v=>Math.round(v)/10,sp=zr.spec;
     const cl={};L.segs.forEach(sg=>{const k=c(sg.wd)+'|'+c(sg.len)+(sg.irr?'|異形':'');cl[k]=(cl[k]||0)+1;});
     const list=Object.entries(cl).sort((a,b)=>parseFloat(b[0])-parseFloat(a[0])||parseFloat(b[0].split('|')[1])-parseFloat(a[0].split('|')[1])).map(([k,n])=>{const[wd,ln,irr]=k.split('|');
       return`<div style="display:flex;align-items:center;gap:8px;padding:3px 0">${tileIconSvg(+ln*10,+wd*10,null)}<span style="flex:1;font-size:12px;color:#1A1916">${wd} × ${ln} cm${irr?' <span style="color:var(--warn)">（異形，依現場）</span>':''}</span><span style="font-family:var(--mono);font-size:14px;color:#1A1916">${n}</span><span style="font-size:11px;color:var(--muted)">片</span></div>`;}).join('');
-    cards.push(sumCard(`淋浴間｜${escH(sp.name)}・${escH(w.name||'區域')}（${zoneShape(zr)}）`,null,0,L.tiles,L.order,sp.waste,`以 ${c(L.tw)}×${c(L.th)} cm 整磚估算用量；共 ${L.segs.length} 片長條`,
+    cF.push(sumCard(`淋浴間｜${escH(sp.name)}・${escH(w.name||'區域')}（${zoneShape(zr)}）`,null,0,L.tiles,L.order,sp.waste,`以 ${c(L.tw)}×${c(L.th)} cm 整磚估算用量；共 ${L.segs.length} 片長條`,
       `<div style="font-weight:600;color:var(--accent);margin:2px 0 4px">下單尺寸（請工廠依尺寸裁好）</div>${list}`));});
-  document.getElementById('sumBasic').innerHTML=cards.join('');
+  document.getElementById('sumBasic').innerHTML=[cF,cW,cT].filter(a=>a.length).map(a=>`<div class="sum-stack">${a.join('')}</div>`).join('');
   // 工廠加工
   const rows=fac.map(f=>{const sz=`${Math.round(f.spec.tileW)/10}×${Math.round(f.spec.tileH)/10}`;
     return`<div class="fac-row">${bevelIconSvg(f.spec.tileW,f.spec.tileH,f.cat)}<div class="fac-name">${sz} cm ${f.cat}<div class="fac-area">${[...f.areas].join('、')}</div></div><div class="fac-n">${f.n}<span>片</span></div></div>`;});
   Object.entries(RV).filter(([k])=>k.includes('|')).forEach(([k,r])=>{const sp=r.spec;
     rows.push(`<div class="fac-row">${bevelIconSvg(sp.tileW,sp.tileH,'長單邊背斜')}<div class="fac-name">${Math.round(sp.tileW)/10}×${Math.round(sp.tileH)/10} cm 窗側收邊條（寬 ${r.D} cm，單邊背斜）<div class="fac-area">${r.wins.length} 個窗：${r.pieces} 段、裁 ${r.strips} 條</div></div><div class="fac-n">${r.tiles}<span>片</span></div></div>`);});
-  let field=0;allFaceIds().concat(['floor']).forEach(id=>facePiecesAny(id).forEach(pc=>{if(pieceProcTypes(id,pc).has('現場導角'))field++;}));
-  document.getElementById('sumFactory').innerHTML=(rows.length?rows.join(''):'<div class="info-tip">目前沒有標記「工廠背斜」的磚。</div>')+
-    (field?`<div class="info-tip" style="margin-top:6px">現場導角：${field} 片磚（現場處理，已含在上方數量內）</div>`:'');
+  {const rb={};revFaceIds().forEach(id=>{const ri=revInfo(id);if(!ri)return;revPieces(id).forEach(pc=>{if(!pieceProcTypes(id,pc).has('工廠背斜'))return;
+     const k=ri.spec.tileW+'x'+ri.spec.tileH+'|'+ri.D,g=rb[k]||(rb[k]={spec:ri.spec,D:ri.D,n:0,wins:new Set()});g.n++;g.wins.add(ri.key+ri.e.id);});});
+   Object.values(rb).forEach(g=>rows.push(`<div class="fac-row">${bevelIconSvg(g.spec.tileW,g.spec.tileH,'長單邊背斜')}<div class="fac-name">${Math.round(g.spec.tileW)/10}×${Math.round(g.spec.tileH)/10} cm 窗側收邊條 背斜（寬 ${g.D/10} cm）<div class="fac-area">${g.wins.size} 個窗，共 ${g.n} 段</div></div><div class="fac-n">${g.n}<span>段</span></div></div>`));}
+  let field=0;allFaceIds().concat(['floor']).concat(revFaceIds()).forEach(id=>facePiecesAny(id).forEach(pc=>{if(pieceProcTypes(id,pc).has('現場導角'))field++;}));
+  document.getElementById('sumFactory').innerHTML=(rows.length?rows.join(''):'<div class="info-tip">目前沒有標記「工廠背斜」的磚。</div>');
   {const cf=state._conflicts||[];document.getElementById('mConflicts').innerHTML=cf.length?`<div style="background:#FFF4E5;border:1px solid #E8B37A;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#8A4B0F"><b>⚠ 需要注意（${cf.length}）</b>${cf.map(c=>`<div style="margin-top:3px">• ${c.msg}</div>`).join('')}</div>`:'';}
   document.getElementById('summaryModal').classList.remove('hidden');
 }
