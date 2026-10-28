@@ -789,8 +789,8 @@ canvas{display:block}
     </span>
     <!-- 壁磚圖導覽（切換主角面） -->
     <span id="v3dCtrl" style="display:none;align-items:center;gap:8px">
-      <button class="btn btn-sm" onclick="if(V3.renderer){reset3DView();draw3D();}">重設視角</button>
       <button class="mode-btn active" id="mode3dSelect" onclick="setMode('select')">檢視</button>
+      <button class="btn btn-sm" onclick="if(V3.renderer){reset3DView();draw3D();}">重設視角</button>
       <button class="mode-btn" id="mode3dProc" onclick="setMode(state.mode==='proc'?'select':'proc')">加工標記</button>
       <span id="proc3dType" style="display:none;align-items:center;gap:4px;font-size:12px">
         <select onchange="state.procType=this.value;document.querySelectorAll('#procTypeTags .tag').forEach(t=>t.classList.toggle('active',t.dataset.proc===this.value))" style="width:auto;padding:3px 6px">
@@ -798,14 +798,14 @@ canvas{display:block}
       </span>
       <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" checked onchange="V3.hideFront=this.checked;draw3D()">隱藏前方牆面</label>
       <span id="placeHint" style="display:none;align-items:center;padding:3px 8px;border-radius:4px;background:#2F7BD8;color:#fff;font-size:12px;position:fixed;z-index:50;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.18);left:-999px;top:-999px"></span>
-      <span class="info-tip" id="v3dHelp" title="拖曳空白處旋轉・拖曳設備移動・右鍵或 Shift 拖曳平移・滾輪縮放・Delete 刪除">拖曳旋轉・右鍵平移・滾輪縮放・Del 刪除</span>
+      <span class="info-tip" id="v3dHelp" title="拖曳空白處旋轉・拖曳設備移動・右鍵或 Shift 拖曳平移・滾輪縮放・Delete 刪除">拖曳旋轉・右鍵平移・滾輪縮放</span>
     </span>
     <span id="wallNavCtrl" style="display:none;align-items:center;gap:6px">
       <button class="btn btn-sm" onclick="changeWallFace(-1)" style="padding:4px 10px;font-size:16px;line-height:1">‹</button>
       <span id="wallFaceLbl" style="font-family:var(--mono);font-size:12px;font-weight:500;min-width:54px;text-align:center">A 上牆</span>
       <button class="btn btn-sm" onclick="changeWallFace(1)" style="padding:4px 10px;font-size:16px;line-height:1">›</button>
     </span>
-    <div class="zoom-c" style="margin-left:8px">
+    <div class="zoom-c" id="zoomCtrl" style="margin-left:8px">
       <button class="btn btn-sm" onclick="zoom(-0.25)">−</button>
       <span id="zoomLbl" style="font-family:var(--mono);font-size:11px;min-width:34px;text-align:center">1×</span>
       <button class="btn btn-sm" onclick="zoom(0.25)">+</button>
@@ -1462,6 +1462,7 @@ function setView(v){
   if(wallCtrl)wallCtrl.style.display=isWall?'flex':'none';
   const v3c=document.getElementById('v3dCtrl');
   if(v3c)v3c.style.display=v==='unfold'?'flex':'none';
+  {const zc=document.getElementById('zoomCtrl');if(zc)zc.style.display=v==='unfold'?'none':'';}
   if(v!=='unfold'){
     document.getElementById('view3d').style.display='none';
     document.getElementById('fc').style.display='block';
