@@ -596,6 +596,28 @@ canvas{display:block}
 </div>
 <style>.wet-h{font-size:11px;font-weight:600;color:var(--accent);margin:10px 0 4px}</style>
 
+<!-- 壁磚分區 Modal -->
+<div class="modal-overlay hidden" id="wzModal" onclick="if(event.target===this)closeWZoneModal()">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">壁磚分區　<span id="wzFace" style="font-size:12px;color:var(--muted);font-weight:400"></span></div>
+    <div class="row">
+      <div class="field"><label>區域名稱</label><input type="text" id="wzName" oninput="wzApply()"></div>
+      <div class="field"><label>使用壁磚</label><select id="wzTile" onchange="wzApply()"></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>左右起鋪</label><select id="wzAlignX" onchange="wzApply()"><option value="wall">對齊整面牆的磚縫</option><option value="left">從區域左邊整磚</option><option value="right">從區域右邊整磚</option></select></div>
+      <div class="field"><label>上下起鋪</label><select id="wzAlignY" onchange="wzApply()"><option value="bottom">從區域下緣整磚</option><option value="top">從區域上緣整磚</option><option value="wall">對齊整面牆的磚縫</option></select></div>
+    </div>
+    <div class="wet-h">轉角位置（cm，距左／離地）</div>
+    <div id="wzPts" style="max-height:170px;overflow:auto"></div>
+    <div class="info-tip" style="margin-top:4px">新的壁磚要先在側欄「壁磚設定」按 ＋ 新增；區域重疊時，後畫的蓋在先畫的上面。</div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn btn-sm btn-d" onclick="delWZone()">刪除區域</button>
+      <button class="btn btn-sm btn-p" onclick="closeWZoneModal()">完成</button>
+    </div>
+  </div>
+</div>
+
 <!-- 匯出圖面 Modal -->
 <div class="modal-overlay hidden" id="exportModal" onclick="if(event.target===this)closeExportModal()">
   <div class="modal" style="max-width:360px">
@@ -856,6 +878,10 @@ canvas{display:block}
       <span id="ftSplitOpt" style="display:flex;align-items:center;gap:4px">離地<input id="ftH" type="number" step="0.5" min="1" value="90" style="width:58px;flex:none;padding:3px 6px" oninput="ftSet()">cm 以下改用<select id="ftLower" onchange="ftSet()" style="width:auto;flex:none;padding:3px 6px"></select></span>
     </span>
     <span id="ftHint" style="font-size:11px"></span>
+    <span style="width:1px;height:16px;background:var(--border)"></span>
+    <span style="font-weight:600;color:#7B5EA7">分區</span>
+    <span id="wzList" style="display:flex;gap:4px;flex-wrap:wrap"></span>
+    <button class="btn btn-sm" id="wzAddBtn" onclick="startWZoneDraw()" title="在這面牆上依序點選轉角，圈出要換磚的範圍（腰帶、左右分區、局部區塊都可以）">＋ 劃分區域</button>
   </div>
   <div class="canvas-wrap" id="canvasWrap">
     <canvas id="fc"></canvas>
@@ -1441,7 +1467,7 @@ function setView(v){
     document.getElementById('fc').style.display='block';
     document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';
   }
-  if(!(isFloor||(isWall&&(state.mode==='origin'||state.mode==='proc'))||(v==='unfold'&&state.mode==='proc'))&&state.mode!=='select')setMode('select');
+  if(!(isFloor||(isWall&&(state.mode==='origin'||state.mode==='proc'||state.mode==='wzone'))||(v==='unfold'&&state.mode==='proc'))&&state.mode!=='select')setMode('select');
   state.procHover=null;if(typeof V3!=='undefined'&&V3.procObj){V3.procObj.visible=false;}
   updateWallFaceLbl();updateOrgBar();updateFtBar();renderMiniMap();
   scheduleRender();
@@ -1744,7 +1770,7 @@ function wallSnapAt(cx,cy){
 }
 // 滑鼠移動時的吸附提示
 function drawSnapHover(){
-  const r=state.mode==='wet'?state.wetCursor:state.snapHover;if(!r||(state.mode!=='origin'&&state.mode!=='wet'))return;
+  const r=state.mode==='wet'?state.wetCursor:state.mode==='wzone'?state.wzCursor:state.snapHover;if(!r||(state.mode!=='origin'&&state.mode!=='wet'&&state.mode!=='wzone'))return;
   ctx.save();
   if(r.hit){const h=r.hit;ctx.strokeStyle='#F07020';ctx.lineWidth=3;ctx.setLineDash([]);ctx.strokeRect(h.X-1.5,h.Y-1.5,h.w*h.PX+3,h.h*h.PX+3);
     ctx.fillStyle='rgba(240,112,32,.08)';ctx.fillRect(h.X,h.Y,h.w*h.PX,h.h*h.PX);}
@@ -1845,6 +1871,9 @@ function updateFtBar(force){
   document.getElementById('ftSplitOpt').style.display=c.split?'flex':'none';
   if(ae!==document.getElementById('ftH'))document.getElementById('ftH').value=c.splitH||90;
   document.getElementById('ftLower').value=c.lower||'main';
+  {const wl=document.getElementById('wzList');if(wl){const zs=(state.wallZones||[]).filter(z=>z.face===state.orgSel);
+    wl.innerHTML=zs.map(z=>`<button class="btn btn-sm" style="border-color:#7B5EA7;color:#5B3F87" onclick="showWZoneModal(${z.id})">${escH(z.name||'區域')}：${escH(wzTileName(z.tile))} ✎</button>`).join('');}
+   const ab=document.getElementById('wzAddBtn');if(ab){ab.style.display=state.orgSel.startsWith('seg:')?'':'none';ab.classList.toggle('btn-p',state.mode==='wzone');}}
   document.getElementById('ftHint').textContent=(state.tileTypes||[]).length?(fs.length>1?'':'（'+fs[0].lbl+'）'):'在「壁磚設定」新增特殊磚後可指定';
 }
 function ftSet(){
@@ -1920,6 +1949,9 @@ function setMode(m){
   ['select','origin','proc','wet'].forEach(x=>{const b=document.getElementById('mode'+x.charAt(0).toUpperCase()+x.slice(1));if(b)b.classList.toggle('active',x===m);});
   canvas.style.cursor=m==='origin'||m==='wet'?'crosshair':m==='proc'?'cell':'default';
   if(m!=='wet'){state.wetPts=[];state.wetCursor=null;}
+  if(m!=='wzone'){state.wzDraft=null;state.wzCursor=null;}
+  if(m==='wzone')canvas.style.cursor='crosshair';
+  if(typeof updateFtBar==='function')updateFtBar();
   {const b=document.getElementById('mode3dProc');if(b)b.classList.toggle('active',m==='proc');
    const tg=document.getElementById('proc3dType');if(tg)tg.style.display=m==='proc'?'flex':'none';
    const hp=document.getElementById('v3dHelp');if(hp)hp.style.display=m==='proc'?'none':'';
@@ -2436,7 +2468,7 @@ function edgeNear(pieces,x,y,tol,excl){
   const segD=(e)=>{const vx=e.x2-e.x1,vy=e.y2-e.y1,L=vx*vx+vy*vy||1;let t=((x-e.x1)*vx+(y-e.y1)*vy)/L;t=Math.max(0,Math.min(1,t));return Math.hypot(x-(e.x1+vx*t),y-(e.y1+vy*t));};
   for(const pc of pieces){
     if(x<pc.x-tol||x>pc.x+pc.cw+tol||y<pc.y-tol||y>pc.y+pc.ch+tol)continue;
-    pieceEdges(pc,excl).forEach(e=>{const dd=segD(e);if(dd<bd&&dd<tol){bd=dd;best={x1:e.x1,y1:e.y1,x2:e.x2,y2:e.y2};}});
+    pieceEdges(pc,pc.ex||excl).forEach(e=>{const dd=segD(e);if(dd<bd&&dd<tol){bd=dd;best={x1:e.x1,y1:e.y1,x2:e.x2,y2:e.y2};}});
   }
   return best;
 }
@@ -3616,7 +3648,7 @@ function renderTubFaceView(f){
   ctx.fillStyle='#7A776E';ctx.font='10px DM Mono,Noto Sans TC,monospace';ctx.textAlign='center';ctx.textBaseline='top';
   ctx.fillText(`${f.spec.name} ${f.spec.tileW/10}×${f.spec.tileH/10} cm`+(f.kind==='deck'?'　（上＝A 側）':''),X+wPX/2,Y+hPX+66);
   drawFirstTile(X,Y,PX,orgRaw('tub:'+f.s.id+':'+f.edge),f.spec.tileW,f.spec.tileH,f.w,f.h,true);
-  drawSnapHover();drawWallProcHover();updateOrgBar();updateFtBar();renderMiniMap();
+  drawWZoneDraft();drawSnapHover();drawWallProcHover();updateOrgBar();updateFtBar();renderMiniMap();
 }
 // 壁磚圖切換清單：各面牆＋浴缸貼磚面
 function allWallFaces(){
@@ -3664,6 +3696,7 @@ function setTileType(code,f,v){const t=(state.tileTypes||[]).find(t=>t.code===co
 function delTileType(code){
   state.tileTypes=(state.tileTypes||[]).filter(t=>t.code!==code);
   Object.values(state.faceTiles||{}).forEach(c=>{if(c.type===code)c.type='main';if(c.lower===code)c.lower='main';});
+  (state.wallZones||[]).forEach(z=>{if(z.tile===code)z.tile='main';});
   renderTileTypes();updateFtBar(true);scheduleRender();
 }
 // 側欄只顯示摘要；編輯／新增都在彈跳視窗
@@ -3800,6 +3833,75 @@ function wetBlockHtml(){
     <div class="modal-spec"><div style="display:flex;align-items:center;gap:10px">${tileIconSvg(L.tw,L.th,null)}<div style="font-size:13px;font-weight:600;color:var(--text)">${c(L.tw)} × ${c(L.th)} cm　<span style="font-weight:400;color:var(--muted);font-size:11px">裁成長條</span></div></div></div>
     <div class="modal-note">${L.z.isRect?'範圍':'外框'} ${c(L.z.x2-L.z.x1)} × ${c(L.z.y2-L.z.y1)} cm；第一條 ${c(L.first)} cm${L.n?`，其餘 ${L.n} 條各 ${c(L.each)} cm`:''}；長條長 ${c(L.len)} cm${L.len>L.L?`（接縫${w.join==='stagger'?'交丁':'對齊'}）`:''}<br>${L.groups.map(g=>`${c(g.wd)} cm 寬 ${g.pieces} 段：一片可裁 ${g.per} 條，約 ${g.tiles} 片`).join('<br>')}${w.waste?`<br>已含 ${w.waste}% 損耗`:''}</div></div>`;
 }
+// ---- 壁磚分區 UI ----
+function wzTileName(code){if(!code||code==='main')return tileName('wall');const t=(state.tileTypes||[]).find(t=>t.code===code);return t?(t.name||t.code):tileName('wall');}
+function wzHit(face){return(state._wHits||[]).find(h=>h.kind==='seg'&&'seg:'+h.seg.key===face);}
+function wzPick(cx,cy){
+  const d=state.wzDraft;let r;
+  if(d&&d.face){const h=wzHit(d.face);if(!h)return null;
+    const mx=(cx-h.X)/h.PX,my=(cy-h.Y)/h.PX,sd=faceSnapData(h);
+    (state.wallZones||[]).filter(z=>z.face===d.face).forEach(z=>z.pts.forEach(([x,y])=>{sd.xs.push({v:x,lbl:'分區'});sd.ys.push({v:y,lbl:'分區'});}));
+    r=snapPoint(mx,my,sd.xs,sd.ys,sd.pts,SNAP_PX/h.PX);r.x=Math.max(0,Math.min(h.w,r.x));r.y=Math.max(0,Math.min(h.h,r.y));r.hit=h;}
+  else{r=wallSnapAt(cx,cy);if(!r||r.hit.kind!=='seg')return null;}
+  const h=r.hit,pts=d?d.pts:[];
+  if(pts.length){const l=pts[pts.length-1];
+    if(pts.length>=3){const f=pts[0];if(Math.hypot(f[0]-r.x,f[1]-r.y)*h.PX<SNAP_PX*1.6){r.x=f[0];r.y=f[1];r.close=true;}}
+    if(!r.close){if(Math.abs(r.x-l[0])<Math.abs(r.y-l[1]))r.x=l[0];else r.y=l[1];}}
+  r.px=h.X+r.x*h.PX;r.py=h.Y+r.y*h.PX;r.face='seg:'+h.seg.key;return r;
+}
+function startWZoneDraw(){if(state.view!=='wall')setView('wall');state.wzDraft={face:null,pts:[]};state.wzCursor=null;setMode('wzone');updateFtBar(true);}
+function drawWZoneDraft(){
+  if(state.mode!=='wzone')return;const d=state.wzDraft||{pts:[]},c=state.wzCursor,face=d.face||(c&&c.face),h=face&&wzHit(face);
+  ctx.save();
+  if(h){const P2=([x,y])=>[h.X+x*h.PX,h.Y+y*h.PX],all=d.pts.concat(c&&!c.close?[[c.x,c.y]]:[]);
+    ctx.strokeStyle='#7B5EA7';ctx.fillStyle='rgba(123,94,167,.12)';ctx.lineWidth=2;
+    if(all.length){ctx.beginPath();all.forEach((p,i)=>{const[a,b]=P2(p);if(i)ctx.lineTo(a,b);else ctx.moveTo(a,b);});if(c&&c.close)ctx.closePath();if(all.length>2)ctx.fill();ctx.stroke();}
+    ctx.font='bold 10px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let i=0;i+1<all.length;i++){const a=all[i],b=all[i+1],L=Math.round(Math.hypot(b[0]-a[0],b[1]-a[1]))/10;if(!L)continue;const[mx,my]=P2([(a[0]+b[0])/2,(a[1]+b[1])/2]),t=L+' cm',w=ctx.measureText(t).width+8;
+      ctx.fillStyle='#7B5EA7';ctx.fillRect(mx-w/2,my-8,w,16);ctx.fillStyle='#fff';ctx.fillText(t,mx,my);}
+    d.pts.forEach((p,i)=>{const[a,b]=P2(p);ctx.beginPath();ctx.arc(a,b,i?4:6,0,Math.PI*2);ctx.fillStyle=i?'#7B5EA7':'#fff';ctx.fill();ctx.strokeStyle='#7B5EA7';ctx.stroke();});}
+  const hint=(d.pts.length<3?'點選要換磚範圍的每個轉角（邊會保持水平／垂直，會吸附牆角、門窗、缸緣）':'回到起點、雙擊或按 Enter 完成；Backspace 復原；Esc 取消');
+  ctx.font='12px Noto Sans TC,sans-serif';const hw=ctx.measureText(hint).width+16;ctx.fillStyle='rgba(18,26,23,.85)';ctx.fillRect(8,8,hw,24);ctx.fillStyle='#FFF';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(hint,16,20);
+  ctx.restore();
+}
+function finishWZone(){
+  const d=state.wzDraft;state.wzDraft=null;state.wzCursor=null;
+  let pts=d&&d.pts?d.pts.slice():[];
+  if(pts.length>=3){const f=pts[0],l=pts[pts.length-1];if(Math.abs(f[0]-l[0])>0.5&&Math.abs(f[1]-l[1])>0.5)pts.push([l[0],f[1]]);}
+  pts=pts.filter((p,i)=>{const q=pts[(i+pts.length-1)%pts.length];return Math.abs(p[0]-q[0])>0.5||Math.abs(p[1]-q[1])>0.5;});
+  pts=pts.filter((p,i)=>{const a=pts[(i+pts.length-1)%pts.length],b=pts[(i+1)%pts.length];return!((Math.abs(a[0]-p[0])<0.5&&Math.abs(b[0]-p[0])<0.5)||(Math.abs(a[1]-p[1])<0.5&&Math.abs(b[1]-p[1])<0.5));});
+  setMode('select');
+  if(pts.length<4||polyRects(pts).reduce((t,r)=>t+rArea(r),0)<50*50){scheduleRender();updateFtBar(true);return;}
+  state.wallZones=state.wallZones||[];
+  const id=Date.now(),n=state.wallZones.filter(z=>z.face===d.face).length+1,t1=(state.tileTypes||[])[0];
+  state.wallZones.push({id,face:d.face,name:'區域'+n,tile:t1?t1.code:'main',pts:pts.map(([x,y])=>[Math.round(x),Math.round(y)]),alignX:'wall',alignY:'bottom'});
+  state.orgSel=d.face;scheduleRender();updateFtBar(true);showWZoneModal(id);
+}
+let _wzEdit=null;
+function wzPtsHtml(z){
+  const H=P().wallH*10;
+  return z.pts.map(([x,y],i)=>{const n=z.pts[(i+1)%z.pts.length],L=Math.round(Math.hypot(n[0]-x,n[1]-y))/10;
+    return`<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-family:var(--mono);font-size:11px;color:var(--muted);width:18px">${i+1}</span>
+      <input type="number" step="0.5" value="${Math.round(x)/10}" style="width:76px" onchange="wzSetPt(${i},0,this.value*10)"><input type="number" step="0.5" value="${Math.round(H-y)/10}" style="width:76px" onchange="wzSetPt(${i},1,${H}-this.value*10)">
+      <span style="font-size:11px;color:var(--muted)">→ ${i+2>z.pts.length?1:i+2}：${L} cm</span></div>`;}).join('');
+}
+function wzSetPt(i,ax,v){const z=(state.wallZones||[]).find(z=>z.id===_wzEdit);if(!z)return;v=+v;if(isNaN(v))return;const n=z.pts.length,old=z.pts[i][ax];z.pts[i][ax]=v;
+  [(i+n-1)%n,(i+1)%n].forEach(j=>{if(Math.abs(z.pts[j][ax]-old)<0.5)z.pts[j][ax]=v;});document.getElementById('wzPts').innerHTML=wzPtsHtml(z);scheduleRender();}
+function showWZoneModal(id){
+  const z=(state.wallZones||[]).find(z=>z.id===id);if(!z)return;_wzEdit=id;
+  const sg=getSeg(z.face.slice(4));document.getElementById('wzFace').textContent=sg?sg.tag+' 牆':'';
+  document.getElementById('wzName').value=z.name||'';
+  document.getElementById('wzTile').innerHTML=`<option value="main">${escH(tileName('wall'))}</option>`+(state.tileTypes||[]).map(t=>`<option value="${t.code}">${escH(t.name||t.code)}</option>`).join('');
+  document.getElementById('wzTile').value=z.tile||'main';
+  document.getElementById('wzAlignX').value=z.alignX||'wall';document.getElementById('wzAlignY').value=z.alignY||'bottom';
+  document.getElementById('wzPts').innerHTML=wzPtsHtml(z);
+  document.getElementById('wzModal').classList.remove('hidden');
+}
+function wzApply(){const z=(state.wallZones||[]).find(z=>z.id===_wzEdit);if(!z)return;
+  z.name=document.getElementById('wzName').value;z.tile=document.getElementById('wzTile').value;
+  z.alignX=document.getElementById('wzAlignX').value;z.alignY=document.getElementById('wzAlignY').value;updateFtBar(true);scheduleRender();}
+function closeWZoneModal(){document.getElementById('wzModal').classList.add('hidden');_wzEdit=null;updateFtBar(true);scheduleRender();}
+function delWZone(){state.wallZones=(state.wallZones||[]).filter(z=>z.id!==_wzEdit);closeWZoneModal();}
 function showTileModal(kind){const n=document.getElementById(kind==='wall'?'wallTileName':'floorTileName');if(n)n.value=tileName(kind);document.getElementById(kind==='wall'?'tileModalWall':'tileModalFloor').classList.remove('hidden');}
 function closeTileModal(){['tileModalFloor','tileModalWall'].forEach(id=>document.getElementById(id).classList.add('hidden'));refreshTileSummary();scheduleRender();}
 function renderTileTypes(){
@@ -3857,17 +3959,57 @@ function faceOriginFor(id,base,tw,th){
   if(base.seg)return segOrigin(base.seg,P(),tw,th);
   const [k,a,b]=id.split(':');return anchorOrigin((base.tub.s.faceOrgs||{})[b],tw,th);
 }
-// 一面的所有磚片（每片帶 spec）
+// ---- 壁磚分區：在牆面上點選轉角圈出範圍，各區選用哪一種壁磚 ----
+// state.wallZones=[{id,face:'seg:KEY',name,tile:'main'|'S1',pts:[[x,y]…]（面內 mm，y 從天花往下）,alignX:'wall'|'left'|'right',alignY:'bottom'|'top'|'wall'}]
+function faceRegions(id,base){
+  if(!id.startsWith('seg:'))return[];
+  return(state.wallZones||[]).filter(z=>z.face===id&&z.pts&&z.pts.length>=4).map(z=>{
+    const poly=z.pts.map(([x,y])=>[Math.max(0,Math.min(base.w,x)),Math.max(0,Math.min(base.h,y))]);
+    const rects=polyRects(poly).filter(r=>r.x2-r.x1>=5&&r.y2-r.y1>=5);
+    const t=z.tile&&z.tile!=='main'?tileTypeSpec(z.tile):null;
+    return{z,poly,rects,spec:t||base.main};
+  }).filter(r=>r.rects.length);
+}
+// 直線被切到時，把磚片縮成實際大小（之後可跟其他裁切片配對）；切完不是矩形就維持「異形裁切」
+function trimByRects(pcs,rects,other){
+  if(!rects.length)return pcs;
+  pcs.forEach(pc=>{
+    const r0={x1:pc.x,y1:pc.y,x2:pc.x+pc.cw,y2:pc.y+pc.ch};
+    if(!rects.some(e=>rectOverlap(r0,e))||other.some(e=>rectOverlap(r0,e)))return;
+    let rem=[r0];rects.forEach(e=>{rem=rem.flatMap(q=>subRect(q,e));});
+    rem=rem.filter(q=>q.x2-q.x1>0.5&&q.y2-q.y1>0.5);if(!rem.length)return;
+    const r=rectsBBox(rem);if(Math.abs(rem.reduce((t,q)=>t+rArea(q),0)-rArea(r))>1)return;
+    pc.x=r.x1;pc.y=r.y1;pc.cw=r.x2-r.x1;pc.ch=r.y2-r.y1;
+    const wT=pc.cw<pc.tileW-.5,hT=pc.ch<pc.tileH-.5;pc.isPartial=true;pc.cutDir=(wT&&hT)?'corner':wT?'vertical':'horizontal';
+  });
+  return pcs;
+}
+// 一面的所有磚片（每片帶 spec；pc.ex＝這片排磚時的排除區，用來找實際露出的邊）
 function facePieces(id,base){
   base=base||faceBase(id);if(!base)return[];
   const zs=faceZones(id,base),out=[];
+  const regs=faceRegions(id,base),regRects=regs.flatMap(r=>r.rects),baseEx=base.excl.concat(regRects);
   const ref=zs.length>1?anchorPt(orgRaw(id)).y:0;
   zs.forEach((z,zi)=>{
     const sp=z.spec,o=faceOriginFor(id,base,sp.tileW,sp.tileH);
     let oy=o.y;
     if(zs.length>1){const inZ=ref>=z.y0&&ref<=z.y1;if(!inZ)oy=zi===0?z.y1-sp.tileH:z.y0;} // 不含基準點的那段：從分段線起整磚
-    const ex=base.excl.filter(e=>e.y2>z.y0&&e.y1<z.y1).map(e=>({...e,y1:Math.max(0,e.y1-z.y0),y2:Math.min(z.y1-z.y0,e.y2-z.y0)}));
-    layoutSurface(base.w,z.y1-z.y0,o.x,oy-z.y0,sp.tileW,sp.tileH,sp.grout,sp.layout,ex).forEach(pc=>out.push({...pc,y:pc.y+z.y0,spec:sp,code:sp.code||'main'}));
+    const ex=baseEx.filter(e=>e.y2>z.y0&&e.y1<z.y1).map(e=>({...e,y1:Math.max(0,e.y1-z.y0),y2:Math.min(z.y1-z.y0,e.y2-z.y0)}));
+    const pcs=layoutSurface(base.w,z.y1-z.y0,o.x,oy-z.y0,sp.tileW,sp.tileH,sp.grout,sp.layout,ex).map(pc=>({...pc,y:pc.y+z.y0,spec:sp,code:sp.code||'main',ex:baseEx}));
+    out.push(...trimByRects(pcs,regRects,base.excl));
+  });
+  // 各分區（後畫的區域蓋在先畫的上面）
+  regs.forEach((rg,i)=>{
+    const sp=rg.spec,bb=rectsBBox(rg.rects);
+    let comp=[bb];rg.rects.forEach(e=>{comp=comp.flatMap(q=>subRect(q,e));});
+    const later=regs.slice(i+1).flatMap(r=>r.rects),rex=base.excl.concat(comp,later);
+    const wo=faceOriginFor(id,base,sp.tileW,sp.tileH),z=rg.z;
+    const ox=z.alignX==='left'?bb.x1:z.alignX==='right'?bb.x2-sp.tileW:wo.x;
+    const oy=z.alignY==='top'?bb.y1:z.alignY==='wall'?wo.y:bb.y2-sp.tileH;
+    const loc=rex.filter(e=>rectOverlap(e,bb)).map(e=>({...e,x1:Math.max(0,e.x1-bb.x1),y1:Math.max(0,e.y1-bb.y1),x2:Math.min(bb.x2-bb.x1,e.x2-bb.x1),y2:Math.min(bb.y2-bb.y1,e.y2-bb.y1)}));
+    const pcs=layoutSurface(bb.x2-bb.x1,bb.y2-bb.y1,ox-bb.x1,oy-bb.y1,sp.tileW,sp.tileH,sp.grout,sp.layout,loc)
+      .map(pc=>({...pc,x:pc.x+bb.x1,y:pc.y+bb.y1,spec:sp,code:sp.code||'main',ex:rex,clip:rg.poly,region:z.id}));
+    out.push(...trimByRects(pcs,comp.concat(later),base.excl));
   });
   return out;
 }
@@ -3926,11 +4068,22 @@ function drawFacePieces(X,Y,base,pieces,labels){
   ctx.save();ctx.beginPath();ctx.rect(X,Y,base.w*PX,base.h*PX);ctx.clip();
   pieces.forEach((pc,i)=>{
     const px=X+pc.x*PX,py=Y+pc.y*PX,pw=pc.cw*PX,ph=pc.ch*PX;
+    if(pc.clip){ctx.save();ctx.beginPath();pc.clip.forEach(([x,y],k)=>{if(k)ctx.lineTo(X+x*PX,Y+y*PX);else ctx.moveTo(X+x*PX,Y+y*PX);});ctx.closePath();ctx.clip();}
     if(pc.spec.color){ctx.fillStyle=pc.spec.color;ctx.fillRect(px,py,pw,ph);
       if(pc.isPartial&&state.showCut!==false){ctx.fillStyle='rgba(240,190,90,.30)';ctx.fillRect(px,py,pw,ph);}}
     else{ctx.fillStyle=tileFill(pc.isPartial);ctx.fillRect(px,py,pw,ph);}
     if(!state._px){ctx.strokeStyle='#C0BCB4';ctx.lineWidth=0.5;ctx.strokeRect(px+.5,py+.5,pw-1,ph-1);}
+    else if(pc.clip){ctx.strokeStyle='#A8A296';ctx.lineWidth=Math.max(1,(pc.spec.grout||2)*PX);ctx.strokeRect(px,py,pw,ph);}
+    if(pc.clip)ctx.restore();
   });
+  // 分區外框與名稱
+  if(base.seg&&!state._px)faceRegions('seg:'+base.seg.key,base).forEach(rg=>{
+    ctx.save();ctx.strokeStyle='#7B5EA7';ctx.lineWidth=1.6;ctx.setLineDash([6,3]);ctx.beginPath();
+    rg.poly.forEach(([x,y],k)=>{if(k)ctx.lineTo(X+x*PX,Y+y*PX);else ctx.moveTo(X+x*PX,Y+y*PX);});ctx.closePath();ctx.stroke();ctx.setLineDash([]);
+    const bb=rectsBBox(rg.rects),t=`${rg.z.name||'區域'}・${rg.spec.code&&rg.spec.code!=='main'?rg.spec.name:tileName('wall')}`;
+    ctx.font='bold 10px Noto Sans TC,sans-serif';const tw=ctx.measureText(t).width+8;
+    ctx.fillStyle='rgba(123,94,167,.9)';ctx.fillRect(X+bb.x1*PX+2,Y+bb.y1*PX+2,tw,15);ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,X+bb.x1*PX+6,Y+bb.y1*PX+9.5);
+    ctx.restore();});
   if(labels&&state.showNum!==false){
     const obs=faceObstacles(base.seg?'seg:'+base.seg.key:'',base);
     pieces.forEach((pc,i)=>{if(!labels[i])return;
@@ -4482,7 +4635,7 @@ function renderWallView(){
   // 各段起鋪點標記
   state._wHits.forEach(h=>{const id='seg:'+h.seg.key;drawFirstTile(h.X,h.Y,h.PX,orgRaw(id),p.wallTileW,p.wallTileH,h.w,h.h,state.orgSel===id||state._wHits.length===1);
     if(state.mode==='origin'&&state.orgSel==='seg:'+h.seg.key&&state._wHits.length>1){ctx.save();ctx.strokeStyle='#F07020';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.strokeRect(h.X-3,h.Y-3,h.w*h.PX+6,h.h*h.PX+6);ctx.restore();}});
-  drawSnapHover();drawWallProcHover();updateOrgBar();updateFtBar();renderMiniMap();
+  drawWZoneDraft();drawSnapHover();drawWallProcHover();updateOrgBar();updateFtBar();renderMiniMap();
 }
 // 起鋪點標記（只畫在該面範圍內）
 function drawOrgMark(x,y,X,Y,W,H){
@@ -4821,7 +4974,8 @@ function build3D(){
     const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;mesh.matrix.copy(m);
     const edges=edgeLines(geo,0x1A1916,0.9);mesh.add(edges);
     {const o=segOrigin(seg,p),ex=wallObsExclusions(seg.key,seg.len,Hmm);
-     mesh.add(tileLines3D(facePieces('seg:'+seg.key),ex,(x,y)=>new THREE.Vector3(x/10,H-y/10,0.2)));
+     {const grp=new Map();facePieces('seg:'+seg.key).forEach(pc=>{const k=pc.ex||ex;if(!grp.has(k))grp.set(k,[]);grp.get(k).push(pc);});
+      grp.forEach((pcs,k)=>mesh.add(tileLines3D(pcs,k,(x,y)=>new THREE.Vector3(x/10,H-y/10,0.2))));}
      addWindowReveals3D(mesh,seg,ex,H);}
     root.add(mesh);
     const sp=letterSprite(seg.tag||seg.key);
@@ -5493,6 +5647,10 @@ document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){setMode('select');e.preventDefault();return;}
     if(e.key==='Enter'){if((state.wetPts||[]).length>=3)finishWetPoly();e.preventDefault();return;}
     if(e.key==='Backspace'){(state.wetPts||[]).pop();scheduleRender();e.preventDefault();return;}}}
+  if(state.mode==='wzone'){const tg=(e.target.tagName||'').toLowerCase();if(tg!=='input'&&tg!=='select'&&tg!=='textarea'){
+    if(e.key==='Escape'){setMode('select');e.preventDefault();return;}
+    if(e.key==='Enter'){if(state.wzDraft&&state.wzDraft.pts.length>=3)finishWZone();e.preventDefault();return;}
+    if(e.key==='Backspace'){if(state.wzDraft)state.wzDraft.pts.pop();scheduleRender();e.preventDefault();return;}}}
   const tag=(e.target.tagName||'').toLowerCase();
   if((e.key==='Delete'||e.key==='Backspace')&&is3D()&&tag!=='input'&&tag!=='select'&&tag!=='textarea'){
     const o=state.obstacles.find(o=>o.selected),st=state.stickers.find(s=>s.selected);
@@ -5575,6 +5733,13 @@ function hitTestSticker(s,ix,iy,p,d,wtmm){
 }
 
 canvas.addEventListener('mousedown',e=>{
+  if(state.view==='wall'&&state.mode==='wzone'){
+    const rc=canvas.getBoundingClientRect(),r=wzPick(e.clientX-rc.left,e.clientY-rc.top);if(!r)return;
+    const d=state.wzDraft=state.wzDraft||{face:null,pts:[]};
+    if(r.close){finishWZone();return;}
+    if(!d.face)d.face=r.face;const l=d.pts[d.pts.length-1];
+    if(!l||Math.abs(l[0]-r.x)>0.5||Math.abs(l[1]-r.y)>0.5)d.pts.push([r.x,r.y]);scheduleRender();return;
+  }
   if(state.view==='wall'&&state.mode==='proc'){
     const rc=canvas.getBoundingClientRect(),r=wallProcAt(e.clientX-rc.left,e.clientY-rc.top);if(r)procToggle(r.face,r.e);return;
   }
@@ -5659,6 +5824,9 @@ canvas.addEventListener('mousemove',e=>{
     if(!!h!==!!old||(h&&old&&!sameEdge(h,old.e))){state.procHover=h?{face:'floor',e:h}:null;scheduleRender();}
     canvas.style.cursor=h?'pointer':'cell';return;
   }
+  if(state.mode==='wzone'&&state.view==='wall'){
+    const rc=canvas.getBoundingClientRect();state.wzCursor=wzPick(e.clientX-rc.left,e.clientY-rc.top);scheduleRender();canvas.style.cursor='crosshair';return;
+  }
   if(state.mode==='proc'&&state.view==='wall'){
     const rc=canvas.getBoundingClientRect(),r=wallProcAt(e.clientX-rc.left,e.clientY-rc.top),old=state.procHover;
     if(!!r!==!!old||(r&&old&&(r.face!==old.face||!sameEdge(r.e,old.e)))){state.procHover=r;scheduleRender();}
@@ -5697,7 +5865,7 @@ canvas.addEventListener('mousemove',e=>{
 });
 
 canvas.addEventListener('mouseup',()=>{state.dragging=null;});
-canvas.addEventListener('dblclick',()=>{if(state.mode==='wet'&&(state.wetPts||[]).length>=3)finishWetPoly();});
+canvas.addEventListener('dblclick',()=>{if(state.mode==='wet'&&(state.wetPts||[]).length>=3)finishWetPoly();if(state.mode==='wzone'&&state.wzDraft&&state.wzDraft.pts.length>=3)finishWZone();});
 canvas.addEventListener('mouseleave',()=>{state.dragging=null;if(state.snapHover||state.procHover){state.snapHover=null;state.procHover=null;scheduleRender();}});
 
 function zoom(d){if(is3D()){V3.radius=Math.max(30,V3.radius*(d>0?0.8:1.25));draw3D();return;}state.scale=Math.max(0.25,Math.min(5,state.scale+d));document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';scheduleRender();}
@@ -5792,7 +5960,7 @@ function projectData(){
       lShape:p.lShape,lCorner:p.lCorner,lCutW:p.lCutW,lCutH:p.lCutH,
       roomShape:document.getElementById('roomShape').value
     },
-    version2:{space:{steps:state.space.steps},wallOrgs:state.wallOrgs||{},floorOrg:state.floorOrg||null,tileTypes:state.tileTypes||[],faceTiles:state.faceTiles||{},wet:state.wet||null,tileNames:state.tileNames||{},spaceDone:!!state.spaceDone},
+    version2:{space:{steps:state.space.steps},wallOrgs:state.wallOrgs||{},floorOrg:state.floorOrg||null,tileTypes:state.tileTypes||[],faceTiles:state.faceTiles||{},wet:state.wet||null,tileNames:state.tileNames||{},wallZones:state.wallZones||[],spaceDone:!!state.spaceDone},
     obstacles:state.obstacles,
     stickers:state.stickers,
     procs:state.procs
@@ -5819,7 +5987,7 @@ function loadProjectData(data,undo){
   const v2=data.version2||{};
   const wasDone=!!state.spaceDone;
   state.space={steps:(v2.space&&v2.space.steps)||[]};
-  state.wallOrgs=v2.wallOrgs||{};state.floorOrg=v2.floorOrg||null;state.tileTypes=v2.tileTypes||[];state.faceTiles=v2.faceTiles||{};state.wet=v2.wet||null;state.tileNames=v2.tileNames||{};renderTileTypes();
+  state.wallOrgs=v2.wallOrgs||{};state.floorOrg=v2.floorOrg||null;state.tileTypes=v2.tileTypes||[];state.faceTiles=v2.faceTiles||{};state.wet=v2.wet||null;state.tileNames=v2.tileNames||{};state.wallZones=v2.wallZones||[];renderTileTypes();
   _space.key='';_space.model=null; // 重新建立空間，不做牆面換算
   state.obstacles=data.obstacles||[];
   state.stickers=data.stickers||[];
@@ -5872,7 +6040,7 @@ function importJSON(e){
 // ---- 統計：磚尺寸圖示＋加工磚區分 ----
 // 某一片磚的哪些邊被標了加工（回傳種類 Set）
 function pieceProcTypes(face,pc){
-  const ts=new Set(),es=pieceEdges(pc,faceExcl(face));
+  const ts=new Set(),es=pieceEdges(pc,pc.ex||faceExcl(face));
   (state.procs||[]).forEach(pr=>{if(procFace(pr)!==face)return;
     const a={x1:Math.min(pr.x1,pr.x2),y1:Math.min(pr.y1,pr.y2),x2:Math.max(pr.x1,pr.x2),y2:Math.max(pr.y1,pr.y2)};
     if(es.some(e=>sameEdge(a,e)))ts.add(pr.type);});
@@ -5887,7 +6055,7 @@ function procStatsFor(items){
 // ---- 背斜加工：依手動「工廠背斜切」標記分類、合併，算出要給工廠加工的磚 ----
 const BEV='工廠背斜切',BEV_GAP=10,BEV_LOSS=5; // 合併：兩片寬度相加＋1cm 要「小於」整磚寬；單片背斜損耗約 5mm
 function pieceBevelEdges(face,pc){
-  const es=pieceEdges(pc,faceExcl(face)),out=[];
+  const es=pieceEdges(pc,pc.ex||faceExcl(face)),out=[];
   (state.procs||[]).forEach(pr=>{if(pr.type!==BEV||procFace(pr)!==face)return;
     const a={x1:Math.min(pr.x1,pr.x2),y1:Math.min(pr.y1,pr.y2),x2:Math.max(pr.x1,pr.x2),y2:Math.max(pr.y1,pr.y2)};
     es.forEach(e=>{if(sameEdge(a,e)&&!out.some(o=>sameEdge(o,e)))out.push(e);});});
