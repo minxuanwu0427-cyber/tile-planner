@@ -820,7 +820,7 @@ canvas{display:block}
   <div id="orgBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 14px;border-bottom:1px solid var(--border);background:#F7FAFA;font-size:12px;color:var(--muted)">
     <span style="font-weight:600;color:var(--accent)">起鋪點</span>
     <select id="obFace" onchange="state.orgSel=this.value;state.orgLock=this.value.includes('#')?this.value:null;updateOrgBar(true);scheduleRender()" style="width:auto;flex:none;min-width:110px;padding:3px 6px"></select>
-    <span id="obBase" style="color:var(--text)"></span>
+    <span id="obBase" style="display:none"></span>
     <span id="obLock" style="display:none"></span>
     <span style="width:1px;height:18px;background:var(--border)"></span>
     <span style="display:flex;align-items:center;gap:5px">整磚方向
@@ -835,7 +835,7 @@ canvas{display:block}
       <button class="btn btn-sm" title="偏移歸零，回到基準點" onclick="obResetOff()">歸零</button>
       <button class="btn btn-sm" title="清除這一面的起鋪點設定，回到預設排法" onclick="obClearAnchor()">恢復預設</button></span>
     <button class="btn btn-sm" id="obRot" style="display:none" onclick="obRotate()"></button>
-    <span id="obInfo" style="font-size:11px;flex-basis:100%"></span>
+    <span id="obInfo" style="display:none"></span>
   </div>
   <!-- 壁磚圖：這一面使用的磚種 -->
   <div id="ftBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 14px;border-bottom:1px solid var(--border);background:#FAFAF7;font-size:12px;color:var(--muted)">
@@ -1764,7 +1764,8 @@ function wallSnapAt(cx,cy){
 function drawSnapHover(){
   const r=state.mode==='wet'?state.wetCursor:state.mode==='wzone'?state.wzCursor:state.snapHover;if(!r||(state.mode!=='origin'&&state.mode!=='wet'&&state.mode!=='wzone'))return;
   ctx.save();
-  if(r.hit){const h=r.hit;ctx.strokeStyle='#F07020';ctx.lineWidth=3;ctx.setLineDash([]);ctx.strokeRect(h.X-1.5,h.Y-1.5,h.w*h.PX+3,h.h*h.PX+3);
+  if(state.mode==='origin'&&r.tid&&r.tid.includes('#')){hoverRegionHL(r);}
+  else if(r.hit){const h=r.hit;ctx.strokeStyle='#F07020';ctx.lineWidth=3;ctx.setLineDash([]);ctx.strokeRect(h.X-1.5,h.Y-1.5,h.w*h.PX+3,h.h*h.PX+3);
     ctx.fillStyle='rgba(240,112,32,.08)';ctx.fillRect(h.X,h.Y,h.w*h.PX,h.h*h.PX);}
   ctx.strokeStyle=r.snap===2?'#C0392B':'#F07020';ctx.lineWidth=1;ctx.setLineDash([4,3]);
   if(r.snap){ctx.beginPath();ctx.moveTo(r.px,r.py-2000);ctx.lineTo(r.px,r.py+2000);ctx.moveTo(r.px-2000,r.py);ctx.lineTo(r.px+2000,r.py);ctx.globalAlpha=.35;ctx.stroke();ctx.globalAlpha=1;}
@@ -1855,16 +1856,16 @@ function obResetOff(){const o=orgRaw(state.orgSel);o.dx=0;o.dy=0;orgStore(state.
 function updateFtBar(force){
   const bar=document.getElementById('ftBar');if(!bar)return;
   const show=state.spaceDone&&state.view==='wall';bar.style.display=show?'flex':'none';if(!show)return;
-  const fs=orgBarFaces();if(!fs.length)return;
+  const fs=orgBarFaces(true);if(!fs.length)return;
   const ff=fs.filter(f=>!f.region);
-  if(!fs.some(f=>f.id===state.orgSel))state.orgSel=ff[0].id;
+  if(!fs.some(f=>f.id===state.orgSel)&&ff[0])state.orgSel=ff[0].id;
   const sel=document.getElementById('ftFace');
   const sig=ff.map(f=>f.id+f.lbl).join('|');
   if(force||sig!==bar._sig){bar._sig=sig;sel.innerHTML=ff.map(f=>`<option value="${f.id}">${f.lbl}</option>`).join('');}
   sel.value=state.orgSel.split('#')[0];sel.style.display=ff.length>1?'':'none';
   const id=state.orgSel.split('#')[0],base=zedTileName(id,faceCfg(id).type||'main'),zs=id.startsWith('seg:')?faceRegions(id,faceBase(id)):[];
   document.getElementById('ftInfo').innerHTML=`<span>整面：<b style="color:var(--text)">${escH(base)}</b></span>`+
-    zs.map(r=>`<span style="padding:2px 8px;border:1px solid #7B5EA7;border-radius:5px;color:#5B3F87">${escH(r.z.name||'區域')}：${escH(r.spec.name)}</span>`).join('');
+    (state.mode==='origin'?zs:[]).map(r=>`<span style="padding:2px 8px;border:1px solid #7B5EA7;border-radius:5px;color:#5B3F87">${escH(r.z.name||'區域')}：${escH(r.spec.name)}</span>`).join('');
 }
 function ftSet(){
   const id=state.orgSel;if(!id)return;state.faceTiles=state.faceTiles||{};
@@ -1875,10 +1876,10 @@ function ftSet(){
 }
 function obRotate(){const pt=state.orgSel.split(':');if(pt[0]==='tub')toggleTubRot(pt[1],pt[2]);}
 // 數值列
-function orgBarFaces(){
+function orgBarFaces(all){ // all：連同已分區的整面（磚種列用）
   const regs=(f,lbl,list)=>list.map(r=>({id:f+'#'+r.z.id,lbl:lbl+'・'+(r.z.name||'區域'),region:true}));
-  if(state.view==='floor'){const sp=faceIsSplit('floor');return(sp?[]:[{id:'floor',lbl:'地磚'}]).concat(regs('floor','地磚',floorZoneList().filter(r=>!r.strip)));}
-  return(state._wHits||[]).flatMap(h=>h.kind==='seg'?(faceIsSplit('seg:'+h.seg.key)?[]:[{id:'seg:'+h.seg.key,lbl:'牆'+h.seg.tag}]).concat(regs('seg:'+h.seg.key,'牆'+h.seg.tag,faceRegions('seg:'+h.seg.key,faceBase('seg:'+h.seg.key)))):[{id:'tub:'+h.face.s.id+':'+h.face.edge,lbl:h.face.label}]);
+  if(state.view==='floor'){const sp=!all&&faceIsSplit('floor');return(sp?[]:[{id:'floor',lbl:'地磚'}]).concat(regs('floor','地磚',floorZoneList().filter(r=>!r.strip)));}
+  return(state._wHits||[]).flatMap(h=>h.kind==='seg'?(!all&&faceIsSplit('seg:'+h.seg.key)?[]:[{id:'seg:'+h.seg.key,lbl:'牆'+h.seg.tag}]).concat(regs('seg:'+h.seg.key,'牆'+h.seg.tag,faceRegions('seg:'+h.seg.key,faceBase('seg:'+h.seg.key)))):[{id:'tub:'+h.face.s.id+':'+h.face.edge,lbl:h.face.label}]);
 }
 // 起鋪點：右鍵鎖定要設定的區域（左鍵只改鎖定的區域，避免點到相鄰區）
 function orgTargetAt(e){
@@ -1897,11 +1898,21 @@ function orgPickRegion(e){
   updateOrgBar(true);scheduleRender();
 }
 function orgUnlock(){state.orgLock=null;updateOrgBar(true);scheduleRender();}
+// 滑鼠所在（或鎖定中）的區域：橘框＋淡橘底
+function hoverRegionHL(r){
+  const[face,aid]=r.tid.split('#');let list,X,Y,PX;
+  if(face==='floor'){const wt=P().wallT*10;[X,Y]=toCanvas(wt,wt);PX=PXpm();list=floorZoneList();}
+  else{if(!r.hit)return;X=r.hit.X;Y=r.hit.Y;PX=r.hit.PX;list=faceRegions(face,faceBase(face));}
+  const g=list.find(q=>String(q.z.id)===aid);if(!g)return;
+  ctx.save();ctx.fillStyle='rgba(240,112,32,.10)';g.rects.forEach(q=>ctx.fillRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));
+  ctx.beginPath();g.rects.forEach(q=>ctx.rect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));ctx.clip();
+  ctx.strokeStyle='#F07020';ctx.lineWidth=5;ctx.setLineDash([]);g.rects.forEach(q=>ctx.strokeRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));ctx.restore();
+}
 // 鎖定中的區域：淡橘色底
 function drawOrgLock(face,list,X,Y,PX){
   if(state.mode!=='origin'||!state.orgLock||!state.orgLock.startsWith(face+'#'))return;
   const r=list.find(r=>face+'#'+r.z.id===state.orgLock);if(!r)return;
-  ctx.save();ctx.fillStyle='rgba(240,112,32,.13)';r.rects.forEach(q=>ctx.fillRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));
+  ctx.save();
   clipRects(r.rects,X,Y,PX);ctx.strokeStyle='#F07020';ctx.lineWidth=3;ctx.setLineDash([6,4]);r.rects.forEach(q=>ctx.strokeRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));ctx.restore();
 }
 // 面被分切線切成多區時：補齊每區的 area，回傳 true
@@ -1953,13 +1964,13 @@ function updateOrgBar(force){
   if(state.orgLock&&!fs.some(f=>f.id===state.orgLock))state.orgLock=null;
   {const lk=document.getElementById('obLock'),hasReg=fs.some(f=>f.region);lk.style.display=hasReg?'':'none';
    if(hasReg){const f=state.orgLock&&fs.find(f=>f.id===state.orgLock);
-     lk.innerHTML=f?`<span class="ob-lock on" title="右鍵點其他區域可切換，右鍵點同一區或按 ✕ 解除">🔒 只設定：<b>${escH(f.lbl)}</b><button onclick="orgUnlock()" title="解除鎖定">✕</button></span>`
-       :`<span class="ob-lock">右鍵點區域可鎖定，之後只改該區</span>`;}}
+     lk.innerHTML=f?`<span class="ob-lock on" title="已鎖定：左鍵只改這一區。右鍵點其他區域切換，右鍵點同一區或按 ✕ 解除">🔒 <b>${escH(f.lbl)}</b><button onclick="orgUnlock()" title="解除鎖定">✕</button></span>`
+       :'';}}
   const sf=orgSurf(state.orgSel);if(!sf)return;
   const o=orgRaw(state.orgSel);
   document.getElementById('obBase').innerHTML=`基準：<b style="color:#C2560F">${o.lbl||'—'}</b>`+(fs.length>1?'':`<span style="color:var(--muted)">（${sf.tag}）</span>`);
   document.querySelectorAll('#obQuad .obq').forEach(b=>b.classList.toggle('on',b.dataset.q===(o.q||'se')));
-  document.getElementById('obInfo').textContent=orgDescribe(state.orgSel,o,sf)+'　（在圖上點選可換基準點）';
+  document.getElementById('obInfo').textContent=orgDescribe(state.orgSel,o,sf)+'';
   const rb=document.getElementById('obRot'),pt=state.orgSel.split(':');
   if(pt[0]==='tub'){const t=state.stickers.find(x=>String(x.id)===pt[1]);if(t){rb.style.display='';rb.textContent='⟳ 磚向 '+tubRotLbl(t,pt[2]);}}else rb.style.display='none';
 }
@@ -3391,7 +3402,8 @@ function regionOrigin(face,a,tw,th,fallback){const o=(state.regionOrgs||{})[face
 // 畫分切線（主畫面）
 function drawSplitLines(face,X,Y,PX,W,H,col){
   const sg=splitSegs(face,W,H);if(!sg.length)return;
-  ctx.save();ctx.strokeStyle=col||'#2F7BD8';ctx.lineWidth=1.8;ctx.setLineDash([7,4]);
+  const view=state.mode==='select'; // 檢視模式：黑色虛線
+  ctx.save();ctx.strokeStyle=view?'#1A1916':(col||'#2F7BD8');ctx.lineWidth=view?1.4:1.8;ctx.setLineDash(view?[6,4]:[7,4]);
   sg.forEach(g=>{ctx.beginPath();if(g.h){ctx.moveTo(X+g.a*PX,Y+g.c*PX);ctx.lineTo(X+g.b*PX,Y+g.c*PX);}else{ctx.moveTo(X+g.c*PX,Y+g.a*PX);ctx.lineTo(X+g.c*PX,Y+g.b*PX);}ctx.stroke();});
   ctx.restore();
 }
@@ -3523,7 +3535,7 @@ function drawFloorZones(X,Y,PX,FA){
     ctx.restore();
   });
   ctx.restore();
-  if(!state._px&&!state._zed){const d=innerDim();drawSplitLines('floor',X,Y,PX,d.iw*10,d.ih*10);drawRegionTags(zl,X,Y,PX,'rgba(47,123,216,.88)');}
+  if(!state._px&&!state._zed){const d=innerDim();drawSplitLines('floor',X,Y,PX,d.iw*10,d.ih*10);if(state.mode==='origin')drawRegionTags(zl,X,Y,PX,'rgba(47,123,216,.88)');}
 }
 // 在一個面上排磚，回傳每一片（已扣除排除區、小於 2cm 的碎片不列）
 function layoutSurface(surfW,surfH,originSX,originSY,tW,tH,grout,layout,excl){
@@ -4247,7 +4259,7 @@ function drawFacePieces(X,Y,base,pieces,labels){
     if(pc.clipR)ctx.restore();
   });
   // 分切線與分區名稱
-  if(base.seg&&!state._px&&!state._zed){const fid='seg:'+base.seg.key;drawSplitLines(fid,X,Y,PX,base.w,base.h,'#7B5EA7');drawRegionTags(faceRegions(fid,base),X,Y,PX,'rgba(123,94,167,.9)');}
+  if(base.seg&&!state._px&&!state._zed){const fid='seg:'+base.seg.key;drawSplitLines(fid,X,Y,PX,base.w,base.h,'#7B5EA7');if(state.mode==='origin')drawRegionTags(faceRegions(fid,base),X,Y,PX,'rgba(123,94,167,.9)');}
   if(labels&&state.showNum!==false){
     const obs=faceObstacles(base.seg?'seg:'+base.seg.key:'',base);
     pieces.forEach((pc,i)=>{if(!labels[i])return;
@@ -5978,7 +5990,9 @@ canvas.addEventListener('mousemove',e=>{
   }
   if(state.mode==='origin'&&(state.view==='floor'||state.view==='wall')){
     const rc=canvas.getBoundingClientRect(),cx=e.clientX-rc.left,cy=e.clientY-rc.top;
-    state.snapHover=state.view==='floor'?floorSnapAt(cx,cy):wallSnapAt(cx,cy);scheduleRender();return;
+    state.snapHover=state.view==='floor'?floorSnapAt(cx,cy):wallSnapAt(cx,cy);
+    if(state.snapHover){const t=orgTargetAt(e);if(t){state.snapHover.face=t.face;state.snapHover.tid=(state.orgLock&&state.orgLock.startsWith(t.face+'#'))?state.orgLock:t.tid;}}
+    scheduleRender();return;
   }
   if(!state.dragging||state.mode!=='select')return;
   const rect=canvas.getBoundingClientRect();
