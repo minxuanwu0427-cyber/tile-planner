@@ -462,7 +462,7 @@ canvas{display:block}
     <div class="sb-body hidden" id="sbProc">
     <div class="info-tip" style="margin-bottom:7px">在地磚圖、壁磚圖或 3D 圖按「加工標記」，滑鼠移到磚邊會先預覽，點擊標記；同種類再點一次可取消。3D 中拖曳空白處仍可旋轉。</div>
     <div class="tag-row" id="procTypeTags" style="margin-bottom:8px">
-      <span class="tag active" data-proc="工廠背斜切" onclick="selProcType(this,'工廠背斜切')">工廠背斜切</span>
+      <span class="tag active" data-proc="工廠背斜" onclick="selProcType(this,'工廠背斜')">工廠背斜</span>
       <span class="tag" data-proc="現場導角" onclick="selProcType(this,'現場導角')">現場導角</span>
     </div>
     <div id="procList" style="margin-bottom:6px"></div>
@@ -779,7 +779,7 @@ canvas{display:block}
       <button class="mode-btn" id="mode3dProc" onclick="setMode(state.mode==='proc'?'select':'proc')">加工標記</button>
       <span id="proc3dType" style="display:none;align-items:center;gap:4px;font-size:12px">
         <select onchange="state.procType=this.value;document.querySelectorAll('#procTypeTags .tag').forEach(t=>t.classList.toggle('active',t.dataset.proc===this.value))" style="width:auto;padding:3px 6px">
-          <option value="工廠背斜切">工廠背斜切</option><option value="現場導角">現場導角</option></select>
+          <option value="工廠背斜">工廠背斜</option><option value="現場導角">現場導角</option></select>
       </span>
       <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" checked onchange="V3.hideFront=this.checked;draw3D()">隱藏前方牆面</label>
       <span id="placeHint" style="display:none;align-items:center;padding:3px 8px;border-radius:4px;background:#2F7BD8;color:#fff;font-size:12px"></span>
@@ -872,7 +872,7 @@ let ctx = canvas.getContext('2d');
 let state = {
   space:{steps:[]}, wallOrgs:{}, spaceDone:false,
   scale:0.65, mode:'select', view:'unfold', wallFace:0,
-  obsType:'door', procType:'工廠背斜切',
+  obsType:'door', procType:'工廠背斜',
   obstacles:[], stickers:[], procs:[],
   dragging:null, dragOffX:0, dragOffY:0,
   _tiles:[]
@@ -882,7 +882,7 @@ const OBS_COLORS={door:'#C8D8E8',window:'#D4E8D4',pipe:'#E8E0D0',column:'#D0D0D0
 const OBS_DEF={door:{w:90},window:{w:90},pipe:{w:20,h:20},column:{w:20,h:20},bathtub:{w:80,h:150}};
 const OBS_LBL={door:'門',window:'窗',pipe:'管道間',column:'柱',bathtub:'崁入浴缸'};
 const WALL_TYPES=new Set(['door','window']);
-const PROC_COLORS={'工廠背斜切':'#E24B4A','現場導角':'#3B6D11'};
+const PROC_COLORS={'工廠背斜':'#E24B4A','現場導角':'#2B6CC4'};
 
 const STICKER_DEFAULTS={
   toilet:{w:40,h:65,label:'馬桶'},
@@ -1877,8 +1877,8 @@ function obRotate(){const pt=state.orgSel.split(':');if(pt[0]==='tub')toggleTubR
 // 數值列
 function orgBarFaces(){
   const regs=(f,lbl,list)=>list.map(r=>({id:f+'#'+r.z.id,lbl:lbl+'・'+(r.z.name||'區域'),region:true}));
-  if(state.view==='floor')return[{id:'floor',lbl:'地磚'}].concat(regs('floor','地磚',floorZoneList().filter(r=>!r.strip)));
-  return(state._wHits||[]).flatMap(h=>h.kind==='seg'?[{id:'seg:'+h.seg.key,lbl:'牆'+h.seg.tag}].concat(regs('seg:'+h.seg.key,'牆'+h.seg.tag,faceRegions('seg:'+h.seg.key,faceBase('seg:'+h.seg.key)))):[{id:'tub:'+h.face.s.id+':'+h.face.edge,lbl:h.face.label}]);
+  if(state.view==='floor'){const sp=faceIsSplit('floor');return(sp?[]:[{id:'floor',lbl:'地磚'}]).concat(regs('floor','地磚',floorZoneList().filter(r=>!r.strip)));}
+  return(state._wHits||[]).flatMap(h=>h.kind==='seg'?(faceIsSplit('seg:'+h.seg.key)?[]:[{id:'seg:'+h.seg.key,lbl:'牆'+h.seg.tag}]).concat(regs('seg:'+h.seg.key,'牆'+h.seg.tag,faceRegions('seg:'+h.seg.key,faceBase('seg:'+h.seg.key)))):[{id:'tub:'+h.face.s.id+':'+h.face.edge,lbl:h.face.label}]);
 }
 // 起鋪點：右鍵鎖定要設定的區域（左鍵只改鎖定的區域，避免點到相鄰區）
 function orgTargetAt(e){
@@ -1903,6 +1903,14 @@ function drawOrgLock(face,list,X,Y,PX){
   const r=list.find(r=>face+'#'+r.z.id===state.orgLock);if(!r)return;
   ctx.save();ctx.fillStyle='rgba(240,112,32,.13)';r.rects.forEach(q=>ctx.fillRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));
   clipRects(r.rects,X,Y,PX);ctx.strokeStyle='#F07020';ctx.lineWidth=3;ctx.setLineDash([6,4]);r.rects.forEach(q=>ctx.strokeRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));ctx.restore();
+}
+// 面被分切線切成多區時：補齊每區的 area，回傳 true
+function faceIsSplit(face){
+  if(face.startsWith('tub:'))return false;
+  const W=face==='floor'?innerDim().iw*10:(faceBase(face)||{}).w,H=face==='floor'?innerDim().ih*10:(faceBase(face)||{}).h;if(!W||!H)return false;
+  const regs=splitRegions(face,W,H);if(regs.length<2)return false;
+  regs.forEach((r,i)=>{if(r.a)return;const sp=splitsOf(face,true),n=sp.areas.length+1;r.a={id:Date.now()*10+i,seed:regionSeed(r),tile:'main',name:'區域'+n,dir:'short',firstAt:'start',first:15,n:null,join:'align'};sp.areas.push(r.a);});
+  return true;
 }
 // 點在哪個分區（主畫面設定起鋪點用）
 function regionAtPoint(face,x,y){
@@ -1938,7 +1946,7 @@ function updateOrgBar(force){
   const show=state.spaceDone&&(state.view==='floor'||state.view==='wall')&&state.mode==='origin';
   bar.style.display=show?'flex':'none';if(!show){state.orgLock=null;return;}
   const fs=orgBarFaces();if(!fs.length)return;
-  if(!fs.some(f=>f.id===state.orgSel))state.orgSel=fs[0].id;
+  if(!fs.some(f=>f.id===state.orgSel))state.orgSel=(fs.find(f=>f.id.startsWith(String(state.orgSel).split('#')[0]+'#'))||fs[0]).id;
   const sel=document.getElementById('obFace'),sig=fs.map(f=>f.id+f.lbl).join('|');
   if(force||sig!==_obSig){_obSig=sig;sel.innerHTML=fs.map(f=>`<option value="${f.id}">${f.lbl}</option>`).join('');}
   sel.value=state.orgSel;sel.style.display=fs.length>1?'':'none';
@@ -2534,7 +2542,7 @@ function drawFaceProcs(face,X,Y,PXv){
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
     if(!state._px){const mx=(x1+x2)/2,my=(y1+y2)/2,dx=x2-x1,dy=y2-y1,l=Math.hypot(dx,dy)||1;
       ctx.fillStyle=col;ctx.font='bold 9px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(pr.type==='工廠背斜切'?'斜':'角',mx-dy/l*9,my+dx/l*9);}
+      ctx.fillText(pr.type==='工廠背斜'?'斜':'角',mx-dy/l*9,my+dx/l*9);}
     ctx.restore();
   });
 }
@@ -2943,6 +2951,8 @@ function updateConflicts(){
 }
 function render(){
   try{updateLegend();}catch(e){}
+  // 有分切線的面先補齊各區 area（之後的排磚與起鋪點都以區為單位）
+  try{if(state.spaceDone)Object.keys(state.splits||{}).forEach(id=>{const sp=state.splits[id];if(sp&&(sp.lines||[]).length&&(id==='floor'||(id.startsWith('seg:')&&getSeg(id.slice(4)))))faceIsSplit(id);});}catch(e){}
   histSchedule();refreshTileSummary();enforceTubInside();updateConflicts();
   if(state.space&&!state.spaceDone&&document.getElementById('spaceCanvas')){renderSpacePreview();return;}
   if(state.view==='wall'){renderWallView();return;}
@@ -3234,7 +3244,7 @@ function renderFloorView(){
     const nx=-dy/len, ny=dx/len; // 法線方向
     const offset=9;
     ctx.fillStyle=col;ctx.font='bold 9px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(proc.type==='工廠背斜切'?'斜':'角', mx+nx*offset, my+ny*offset);
+    ctx.fillText(proc.type==='工廠背斜'?'斜':'角', mx+nx*offset, my+ny*offset);
   });
 
   // 加工標記：滑鼠所在磚縫預覽
@@ -3244,8 +3254,9 @@ function renderFloorView(){
   }
 
   // 起鋪點：基準點＋第一片整磚
-  drawFirstTile(tx(wtmm),ty(wtmm),PX,orgRaw('floor'),p.tileW,p.tileH,innerWmm,innerHmm,!String(state.orgSel).startsWith('floor#'));
-  FA.zl.filter(r=>!r.strip).forEach(r=>{const id='floor#'+r.z.id;if(!(state.regionOrgs||{})[id]&&state.orgSel!==id)return;
+  const flSplit=faceIsSplit('floor');
+  if(!flSplit)drawFirstTile(tx(wtmm),ty(wtmm),PX,orgRaw('floor'),p.tileW,p.tileH,innerWmm,innerHmm,!String(state.orgSel).startsWith('floor#'));
+  FA.zl.filter(r=>!r.strip).forEach(r=>{const id='floor#'+r.z.id;if(!flSplit&&!(state.regionOrgs||{})[id]&&state.orgSel!==id)return;
     ctx.save();clipRects(r.rects,tx(wtmm),ty(wtmm),PX);drawFirstTile(tx(wtmm),ty(wtmm),PX,orgRaw(id),r.spec.tileW,r.spec.tileH,innerWmm,innerHmm,state.orgSel===id);ctx.restore();});
   drawOrgLock('floor',FA.zl,tx(wtmm),ty(wtmm),PX);
 
@@ -4787,8 +4798,8 @@ function renderWallView(){
   }
   // 各段起鋪點標記
   state._wHits.forEach(h=>{if(h.kind==='seg')drawOrgLock('seg:'+h.seg.key,faceRegions('seg:'+h.seg.key,faceBase('seg:'+h.seg.key)),h.X,h.Y,h.PX);});
-  state._wHits.forEach(h=>{const id='seg:'+h.seg.key;drawFirstTile(h.X,h.Y,h.PX,orgRaw(id),p.wallTileW,p.wallTileH,h.w,h.h,state.orgSel===id||(state._wHits.length===1&&!String(state.orgSel).startsWith(id+'#')));
-    faceRegions(id,faceBase(id)).forEach(r=>{const rid=id+'#'+r.z.id;if(!(state.regionOrgs||{})[rid]&&state.orgSel!==rid)return;ctx.save();clipRects(r.rects,h.X,h.Y,h.PX);drawFirstTile(h.X,h.Y,h.PX,orgRaw(rid),r.spec.tileW,r.spec.tileH,h.w,h.h,state.orgSel===rid);ctx.restore();});
+  state._wHits.forEach(h=>{if(h.kind!=='seg')return;const id='seg:'+h.seg.key,wsp=faceIsSplit(id);if(!wsp)drawFirstTile(h.X,h.Y,h.PX,orgRaw(id),p.wallTileW,p.wallTileH,h.w,h.h,state.orgSel===id||(state._wHits.length===1&&!String(state.orgSel).startsWith(id+'#')));
+    faceRegions(id,faceBase(id)).forEach(r=>{const rid=id+'#'+r.z.id;if(!wsp&&!(state.regionOrgs||{})[rid]&&state.orgSel!==rid)return;ctx.save();clipRects(r.rects,h.X,h.Y,h.PX);drawFirstTile(h.X,h.Y,h.PX,orgRaw(rid),r.spec.tileW,r.spec.tileH,h.w,h.h,state.orgSel===rid);ctx.restore();});
     if(state.mode==='origin'&&state.orgSel==='seg:'+h.seg.key&&state._wHits.length>1){ctx.save();ctx.strokeStyle='#F07020';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.strokeRect(h.X-3,h.Y-3,h.w*h.PX+6,h.h*h.PX+6);ctx.restore();}});
   drawSnapHover();drawWallProcHover();updateOrgBar();updateFtBar();renderMiniMap();
 }
@@ -6125,7 +6136,7 @@ function loadProjectData(data,undo){
   _space.key='';_space.model=null; // 重新建立空間，不做牆面換算
   state.obstacles=data.obstacles||[];
   state.stickers=data.stickers||[];
-  state.procs=data.procs||[];
+  state.procs=(data.procs||[]).map(pr=>pr&&pr.type==='工廠背斜'+'切'?{...pr,type:'工廠背斜'}:pr);
   if(!undo)migrateLegacyWalls(pm);
   state.spaceDone=v2.spaceDone!==undefined?v2.spaceDone:true;
   onShapeChange();updateSpaceState();renderWallOrgPanel(true);refreshWallSelects();
@@ -6192,8 +6203,8 @@ function procStatsFor(items){
   (items||[]).forEach(it=>{const ts=pieceProcTypes(it.face,it.pc);if(!ts.size)r.plain++;else ts.forEach(t=>r.types[t]=(r.types[t]||0)+1);});
   return r;
 }
-// ---- 背斜加工：依手動「工廠背斜切」標記分類、合併，算出要給工廠加工的磚 ----
-const BEV='工廠背斜切',BEV_GAP=10,BEV_LOSS=5; // 合併：兩片寬度相加＋1cm 要「小於」整磚寬；單片背斜損耗約 5mm
+// ---- 背斜加工：依手動「工廠背斜」標記分類、合併，算出要給工廠加工的磚 ----
+const BEV='工廠背斜',BEV_GAP=10,BEV_LOSS=5; // 合併：兩片寬度相加＋1cm 要「小於」整磚寬；單片背斜損耗約 5mm
 function pieceBevelEdges(face,pc){
   const es=pieceEdges(pc,pc.ex||faceExcl(face)),out=[];
   (state.procs||[]).forEach(pr=>{if(pr.type!==BEV||procFace(pr)!==face)return;
@@ -6345,7 +6356,7 @@ function showSummaryModal(){
   Object.entries(RV).filter(([k])=>k.includes('|')).forEach(([k,r])=>{const sp=r.spec;
     rows.push(`<div class="fac-row">${bevelIconSvg(sp.tileW,sp.tileH,'長單邊背斜')}<div class="fac-name">${Math.round(sp.tileW)/10}×${Math.round(sp.tileH)/10} cm 窗側收邊條（寬 ${r.D} cm，單邊背斜）<div class="fac-area">${r.wins.length} 個窗：${r.pieces} 段、裁 ${r.strips} 條</div></div><div class="fac-n">${r.tiles}<span>片</span></div></div>`);});
   let field=0;allFaceIds().concat(['floor']).forEach(id=>facePiecesAny(id).forEach(pc=>{if(pieceProcTypes(id,pc).has('現場導角'))field++;}));
-  document.getElementById('sumFactory').innerHTML=(rows.length?rows.join(''):'<div class="info-tip">目前沒有標記「工廠背斜切」的磚。</div>')+
+  document.getElementById('sumFactory').innerHTML=(rows.length?rows.join(''):'<div class="info-tip">目前沒有標記「工廠背斜」的磚。</div>')+
     (field?`<div class="info-tip" style="margin-top:6px">現場導角：${field} 片磚（現場處理，已含在上方數量內）</div>`:'');
   {const cf=state._conflicts||[];document.getElementById('mConflicts').innerHTML=cf.length?`<div style="background:#FFF4E5;border:1px solid #E8B37A;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#8A4B0F"><b>⚠ 需要注意（${cf.length}）</b>${cf.map(c=>`<div style="margin-top:3px">• ${c.msg}</div>`).join('')}</div>`:'';}
   document.getElementById('summaryModal').classList.remove('hidden');
