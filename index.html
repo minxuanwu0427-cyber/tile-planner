@@ -469,7 +469,7 @@ canvas{display:block}
         <div class="modal-stat-u">片</div>
       </div>
       <div class="modal-stat">
-        <div class="modal-stat-l">裁切片數</div>
+        <div class="modal-stat-l">裁切用磚</div>
         <div class="modal-stat-v" style="color:var(--warn)" id="mStatCut">—</div>
         <div class="modal-stat-u">片</div>
       </div>
@@ -492,7 +492,7 @@ canvas{display:block}
         <div class="modal-stat-u">片</div>
       </div>
       <div class="modal-stat">
-        <div class="modal-stat-l">裁切片數</div>
+        <div class="modal-stat-l">裁切用磚</div>
         <div class="modal-stat-v" style="color:var(--warn)" id="mWallStatCut">—</div>
         <div class="modal-stat-u">片</div>
       </div>
@@ -3191,9 +3191,10 @@ function renderFloorView(){
 
   if(state.view==='floor'){drawSnapHover();updateOrgBar();}
   // Stats
-  const order=groupPlan(pieces.map(pc=>({face:'floor',pc})),{tileW:p.tileW,tileH:p.tileH},p.waste).order;
+  const fPlan=groupPlan(pieces.map(pc=>({face:'floor',pc})),{tileW:p.tileW,tileH:p.tileH},p.waste),order=fPlan.order;
+  state._floorCut={tiles:fPlan.base-fullCount,pieces:cutCount};
   document.getElementById('statFull').textContent=fullCount;
-  document.getElementById('statCut').textContent=cutCount+(uniqueCutSources<cutCount?' ('+uniqueCutSources+'片磚)':'');
+  document.getElementById('statCut').textContent=fPlan.base-fullCount;
   document.getElementById('statOrder').textContent=order;
   document.getElementById('wasteLbl').textContent=p.waste;
   // 壁磚統計也同步更新
@@ -3505,7 +3506,7 @@ function calculateTubTiles(){
   });
   return Object.values(groups).map(g=>{
     const sources=pairCuts(g.cuts.map(c=>({...c})),0),gp=groupPlan(g.items,g.spec,g.spec.waste);
-    return{spec:g.spec,full:g.full,cut:g.cuts.length,sources,order:gp.order,faces:g.faces};
+    return{spec:g.spec,full:g.full,cut:g.cuts.length,cutTiles:gp.base-g.full,sources,order:gp.order,faces:g.faces};
   });
 }
 // 牆面上被浴缸擋住（缸緣以下）的範圍：不貼磚
@@ -3997,7 +3998,7 @@ function wallNumberingOld(){
 function updateWallStats(){
   const r=calculateWallTiles();
   document.getElementById('wallStatFull').textContent=r.full;
-  document.getElementById('wallStatCut').textContent=r.cut+(r.sources<r.cut?' ('+r.sources+'片磚)':'');
+  document.getElementById('wallStatCut').textContent=r.plan.base-r.full;
   document.getElementById('wallStatOrder').textContent=r.order;
 }
 
@@ -5885,15 +5886,15 @@ function tileIconSvg(wmm,hmm,procType){
 // 一欄的「磚尺寸＋一般／加工」預覽
 function tileSpecHtml(spec,items){
   const w=spec.tileW,h=spec.tileH,sz=`${Math.round(w)/10}×${Math.round(h)/10}cm`;
-  const bev=bevelPlan(items,spec);
-  let plain=0,field=0;(items||[]).forEach(it=>{const ts=pieceProcTypes(it.face,it.pc);if(!ts.size)plain++;if(ts.has('現場導角'))field++;});
+  const gp=groupPlan(items,spec,0),bev=gp.bev,plain=gp.full+gp.sources;
+  let field=0;(items||[]).forEach(it=>{if(pieceProcTypes(it.face,it.pc).has('現場導角'))field++;});
   const cell=(ic,lb,n,u='片')=>`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:58px">${ic}<div style="font-size:10px;color:var(--muted);text-align:center">${lb}</div><div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text)">${n} ${u}</div></div>`;
   const ord=['長單邊背斜','長雙邊背斜','短單邊背斜','短雙邊背斜','單邊背斜','雙邊背斜'];
   const keys=Object.keys(bev.cats).sort((a,b)=>(ord.indexOf(a)+99*(ord.indexOf(a)<0))-(ord.indexOf(b)+99*(ord.indexOf(b)<0)));
   return `<div style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">${Math.round(w)/10} × ${Math.round(h)/10} cm</div>`+
     `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">`+cell(tileIconSvg(w,h,null),'一般',plain)+
     keys.map(k=>cell(bevelIconSvg(w,h,k),`${sz}<br>${k}`,bev.cats[k])).join('')+
-    (field?cell(tileIconSvg(w,h,'現場導角'),'現場導角',field):'')+`</div>`+
+    (field?cell(tileIconSvg(w,h,'現場導角'),'現場導角<br>（磚片數）',field):'')+`</div>`+
     (bev.used.size?`<div style="font-size:10.5px;color:var(--muted);margin-top:5px">背斜：${bev.used.size} 個位置共用 ${bev.tiles} 片加工磚（已計入叫貨），剩料再用於其他裁切</div>`:'');
 }
 function showSummaryModal(){
@@ -5903,7 +5904,7 @@ function showSummaryModal(){
   const lnames={straight:'平貼',half:'1/2交丁（橫）',third:'1/3交丁（橫）','half-v':'1/2交丁（直）'};
   // 地磚
   document.getElementById('mStatFull').textContent=document.getElementById('statFull').textContent;
-  document.getElementById('mStatCut').innerHTML=document.getElementById('statCut').textContent.replace(/\s*\((\d+)片磚\)/,'<span class="cut-src">（$1 片磚）</span>');
+  {const fc=state._floorCut||{tiles:0,pieces:0};document.getElementById('mStatCut').innerHTML=fc.tiles+'<span class="cut-src">（裁成 '+fc.pieces+' 片）</span>';}
   document.getElementById('mStatOrder').textContent=document.getElementById('statOrder').textContent;
   const G0=tileGroupStats();
   document.getElementById('mSpec').innerHTML=tileSpecHtml({tileW:p.tileW,tileH:p.tileH},floorPiecesAll().map(pc=>({face:'floor',pc})));
@@ -5911,7 +5912,7 @@ function showSummaryModal(){
   // 壁磚（重新計算確保最新）
   const wr=calculateWallTiles();
   document.getElementById('mWallStatFull').textContent=wr.full;
-  document.getElementById('mWallStatCut').textContent=wr.cut;
+  document.getElementById('mWallStatCut').innerHTML=(wr.plan.base-wr.full)+'<span class="cut-src">（裁成 '+wr.cut+' 片）</span>';
   document.getElementById('mWallStatOrder').textContent=wr.order;
   document.getElementById('mWallSpec').innerHTML=tileSpecHtml({tileW:p.wallTileW,tileH:p.wallTileH},(G0.main&&G0.main.all)||[]);
   document.getElementById('mWallNote').innerHTML=revealNote(wr.reveal)+(p.wallWaste>0?`建議叫貨已含 ${p.wallWaste}% 損耗`:'（損耗 0%，請依現場條件自行調整）');
@@ -5921,7 +5922,7 @@ function showSummaryModal(){
     <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 7px">嵌入式浴缸 半牆＋檯面（${t.spec.name}，${t.faces} 面）</div>
     <div class="modal-stats">
       <div class="modal-stat"><div class="modal-stat-l">整磚</div><div class="modal-stat-v">${t.full}</div><div class="modal-stat-u">片</div></div>
-      <div class="modal-stat"><div class="modal-stat-l">裁切片數</div><div class="modal-stat-v" style="color:var(--warn)">${t.cut}${t.sources<t.cut?'<span class="cut-src">（'+t.sources+' 片磚）</span>':''}</div><div class="modal-stat-u">片</div></div>
+      <div class="modal-stat"><div class="modal-stat-l">裁切用磚</div><div class="modal-stat-v" style="color:var(--warn)">${t.cutTiles}<span class="cut-src">（裁成 ${t.cut} 片）</span></div><div class="modal-stat-u">片</div></div>
       <div class="modal-stat" style="grid-column:span 2"><div class="modal-stat-l">建議叫貨</div><div class="modal-stat-v" style="color:var(--accent)">${t.order}</div><div class="modal-stat-u">片</div></div>
     </div>
     <div class="modal-spec">${tileSpecHtml(t.spec,((G0['T'+t.spec.key]||{}).all)||[])}</div>
@@ -5935,7 +5936,7 @@ function showSummaryModal(){
     return `<div class="sum-col"><div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 7px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sp.color};margin-right:5px;vertical-align:-1px"></span>${t.code}・${sp.name}</div>
     <div class="modal-stats">
       <div class="modal-stat"><div class="modal-stat-l">整磚</div><div class="modal-stat-v">${g.full}</div><div class="modal-stat-u">片</div></div>
-      <div class="modal-stat"><div class="modal-stat-l">裁切片數</div><div class="modal-stat-v" style="color:var(--warn)">${g.cut}${g.sources<g.cut?'<span class="cut-src">（'+g.sources+' 片磚）</span>':''}</div><div class="modal-stat-u">片</div></div>
+      <div class="modal-stat"><div class="modal-stat-l">裁切用磚</div><div class="modal-stat-v" style="color:var(--warn)">${g.plan.base-g.full}<span class="cut-src">（裁成 ${g.cut} 片）</span></div><div class="modal-stat-u">片</div></div>
       <div class="modal-stat" style="grid-column:span 2"><div class="modal-stat-l">建議叫貨</div><div class="modal-stat-v" style="color:var(--accent)">${g.order}</div><div class="modal-stat-u">片</div></div>
     </div>
     <div class="modal-spec">${tileSpecHtml(sp,g.all)}</div>
@@ -5968,7 +5969,7 @@ function exportSummaryJPG(){
   // stat boxes
   const stats=[
     {label:'整磚',val:document.getElementById('statFull').textContent,unit:'片',color:'#1A1916'},
-    {label:'裁切片數',val:document.getElementById('statCut').textContent,unit:'片',color:'#E67E22'},
+    {label:'裁切用磚',val:document.getElementById('statCut').textContent,unit:'片',color:'#E67E22'},
     {label:'建議叫貨',val:document.getElementById('statOrder').textContent,unit:'片',color:'#2E3B3A'},
   ];
   const boxW=(W-PAD*2-16*2)/3, boxH=100, boxY=PAD+82;
