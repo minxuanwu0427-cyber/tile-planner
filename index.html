@@ -5049,7 +5049,7 @@ function init3D(){
       pt.x=e.clientX;pt.y=e.clientY;
       const [a,b]=[...V3.ptrs.values()];
       const dist=Math.hypot(a.x-b.x,a.y-b.y);
-      if(V3.pinch)V3.radius=Math.max(30,Math.min(20000,V3.radius*V3.pinch/dist));
+      if(V3.pinch)V3.radius=Math.max(V3_MIN_R,Math.min(20000,V3.radius*V3.pinch/dist));
       V3.pinch=dist;
     } else {
       pt.x=e.clientX;pt.y=e.clientY;
@@ -5093,10 +5093,22 @@ function init3D(){
   });
   el.addEventListener('wheel',e=>{
     e.preventDefault();
-    V3.radius=Math.max(30,Math.min(20000,V3.radius*Math.exp(e.deltaY*0.0012)));
-    draw3D();
+    zoom3DAt(e,Math.exp(e.deltaY*0.0012));
   },{passive:false});
   return true;
+}
+// 以滑鼠所在位置為中心縮放：游標下的那一點縮放前後位置不變
+const V3_MIN_R=6;
+function zoom3DAt(e,f){
+  const r0=V3.radius,r1=Math.max(V3_MIN_R,Math.min(20000,r0*f));f=r1/r0;if(Math.abs(f-1)<1e-6)return;
+  let P=null;
+  try{setRay(e);V3.scene.updateMatrixWorld();
+    const h=_ray.intersectObjects(V3.root?[V3.root]:[],true).find(h=>worldVisible(h.object)&&h.object.isMesh&&!(h.object.material&&h.object.material.visible===false));
+    if(h)P=h.point.clone();
+    else{const n=new THREE.Vector3();V3.camera.getWorldDirection(n);const pt=new THREE.Vector3();if(_ray.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(n,V3.target),pt))P=pt;}
+  }catch(err){P=null;}
+  if(P)V3.target=P.clone().add(V3.target.clone().sub(P).multiplyScalar(f));
+  V3.radius=r1;draw3D();
 }
 function pan3D(dx,dy){
   const cam=V3.camera;
@@ -5370,7 +5382,7 @@ function draw3D(){
   if(!V3.renderer)return;
   const t=V3.target,r=V3.radius,cam=V3.camera;
   cam.position.set(t.x+r*Math.sin(V3.phi)*Math.cos(V3.theta),t.y+r*Math.cos(V3.phi),t.z+r*Math.sin(V3.phi)*Math.sin(V3.theta));
-  cam.lookAt(t);cam.updateMatrixWorld();
+  cam.lookAt(t);{const nr=Math.max(0.3,Math.min(5,r*0.03));if(Math.abs(cam.near-nr)>1e-3){cam.near=nr;cam.updateProjectionMatrix();}}cam.updateMatrixWorld();
   // 鏡頭在牆外側時，該面牆變半透明，不擋住室內
   V3.walls.forEach(w=>{
     if(w.col)return;
@@ -5777,7 +5789,7 @@ function show3DProcHover(r){
   if(!r){g.visible=false;return;}
   const a=faceToWorld(r.face,r.e.x1,r.e.y1,0.9),b=faceToWorld(r.face,r.e.x2,r.e.y2,0.9);if(!a||!b){g.visible=false;return;}
   const st=procHoverState(r.face,r.e),len=a.distanceTo(b);
-  const m=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,len,8),new THREE.MeshBasicMaterial({color:new THREE.Color(PROC_COLORS[state.procType]||'#E24B4A'),transparent:true,opacity:st.cancel?0.35:0.9,depthTest:false}));
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(0.03,Math.min(1.2,V3.radius*0.0025)),Math.max(0.03,Math.min(1.2,V3.radius*0.0025)),len,8),new THREE.MeshBasicMaterial({color:new THREE.Color(PROC_COLORS[state.procType]||'#E24B4A'),transparent:true,opacity:st.cancel?0.35:0.9,depthTest:false}));
   m.position.copy(a.clone().add(b).multiplyScalar(0.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize());m.renderOrder=30;
   g.add(m);g.visible=true;
   const hint=document.getElementById('placeHint');
@@ -6101,7 +6113,7 @@ canvas.addEventListener('mouseup',()=>{state.dragging=null;});
 canvas.addEventListener('contextmenu',e=>{if(state.mode==='origin'&&(state.view==='wall'||state.view==='floor'))e.preventDefault();});
 canvas.addEventListener('mouseleave',()=>{state.dragging=null;if(state.snapHover||state.procHover){state.snapHover=null;state.procHover=null;scheduleRender();}});
 
-function zoom(d){if(is3D()){V3.radius=Math.max(30,V3.radius*(d>0?0.8:1.25));draw3D();return;}state.scale=Math.max(0.25,Math.min(5,state.scale+d));document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';scheduleRender();}
+function zoom(d){if(is3D()){V3.radius=Math.max(V3_MIN_R,V3.radius*(d>0?0.8:1.25));draw3D();return;}state.scale=Math.max(0.25,Math.min(5,state.scale+d));document.getElementById('zoomLbl').textContent=state.scale.toFixed(2).replace(/\.?0+$/,'')+'×';scheduleRender();}
 function resetZoom(){
   if(is3D()){reset3DView();draw3D();return;}
   const wrap=document.getElementById('canvasWrap');const p=P();
