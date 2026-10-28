@@ -149,6 +149,22 @@ canvas{display:block}
 .sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:6px}
 .sum-col{border:1px solid var(--border);border-radius:8px;padding:12px;background:#fff}
 .sum-col>div:first-child,.sum-col>div:nth-child(1){margin-top:0!important}
+.sum-sec{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.08em;margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+.sum-t{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 8px}
+.sum-spec{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#1A1916;margin-bottom:8px}
+.sum-eq{display:flex;align-items:stretch;gap:6px}
+.sum-stack{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.sum-box{display:flex;align-items:baseline;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px}
+.sum-l{font-size:11px;color:var(--muted);flex:1;white-space:nowrap}
+.sum-v{font-family:var(--mono);font-size:22px;font-weight:500;color:#1A1916;line-height:1}
+.sum-u{font-size:11px;color:var(--muted)}
+.sum-op{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;line-height:1;min-height:12px}
+.sum-sub{font-size:10.5px;color:var(--muted);padding:2px 2px 0}
+.sum-order{flex-direction:column;align-items:center;justify-content:center;min-width:88px;text-align:center}
+.sum-order .sum-l{flex:none}.sum-order .sum-v{color:var(--warn);font-size:30px;margin:4px 0}
+.fac-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;margin-bottom:6px}
+.fac-name{flex:1;font-size:12.5px;font-weight:600;color:#1A1916}.fac-area{font-size:10.5px;font-weight:400;color:var(--muted);margin-top:2px}
+.fac-n{font-family:var(--mono);font-size:22px;color:#1A1916}.fac-n span{font-size:11px;color:var(--muted);margin-left:3px;font-family:var(--sans)}
 .sum-col .modal-stats{grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
 .sum-col .modal-stat{grid-column:auto!important;padding:8px}
 .sum-col .modal-stat-v{font-size:21px}
@@ -458,55 +474,10 @@ canvas{display:block}
   <div class="modal">
     <div class="modal-title">磚量統計</div>
     <div id="mConflicts"></div>
-    <div class="sum-grid">
-    <div class="sum-col">
-    <!-- 地磚 -->
-    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin-bottom:7px">地磚</div>
-    <div class="modal-stats">
-      <div class="modal-stat">
-        <div class="modal-stat-l">整磚</div>
-        <div class="modal-stat-v" id="mStatFull">—</div>
-        <div class="modal-stat-u">片</div>
-      </div>
-      <div class="modal-stat">
-        <div class="modal-stat-l">裁切用磚</div>
-        <div class="modal-stat-v" style="color:var(--warn)" id="mStatCut">—</div>
-        <div class="modal-stat-u">片</div>
-      </div>
-      <div class="modal-stat" style="grid-column:span 2">
-        <div class="modal-stat-l">建議叫貨</div>
-        <div class="modal-stat-v" style="color:var(--accent)" id="mStatOrder">—</div>
-        <div class="modal-stat-u">片</div>
-      </div>
-    </div>
-    <div class="modal-spec" id="mSpec"></div>
-    <div class="modal-note" id="mNote"></div>
-    </div>
-    <div class="sum-col">
-    <!-- 壁磚 -->
-    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 7px">壁磚（各面合計）</div>
-    <div class="modal-stats">
-      <div class="modal-stat">
-        <div class="modal-stat-l">整磚</div>
-        <div class="modal-stat-v" id="mWallStatFull">—</div>
-        <div class="modal-stat-u">片</div>
-      </div>
-      <div class="modal-stat">
-        <div class="modal-stat-l">裁切用磚</div>
-        <div class="modal-stat-v" style="color:var(--warn)" id="mWallStatCut">—</div>
-        <div class="modal-stat-u">片</div>
-      </div>
-      <div class="modal-stat" style="grid-column:span 2">
-        <div class="modal-stat-l">建議叫貨</div>
-        <div class="modal-stat-v" style="color:var(--accent)" id="mWallStatOrder">—</div>
-        <div class="modal-stat-u">片</div>
-      </div>
-    </div>
-    <div class="modal-spec" id="mWallSpec"></div>
-    <div class="modal-note" id="mWallNote"></div>
-    </div>
-    <div id="mTubBlock" style="display:contents"></div>
-    </div>
+    <div class="sum-sec">基本計算</div>
+    <div class="sum-grid" id="sumBasic"></div>
+    <div class="sum-sec">工廠加工 <span style="font-weight:400;color:var(--muted);letter-spacing:0">（另向工廠叫貨，未計入上方建議叫貨）</span></div>
+    <div id="sumFactory"></div>
     <div class="modal-btns">
       <button class="btn btn-sm" onclick="exportSummaryJPG()">另存 JPG</button>
       <button class="btn btn-sm btn-p" onclick="closeSummaryModal()">關閉</button>
@@ -686,6 +657,7 @@ canvas{display:block}
       <div class="field"><label>窗高 (cm)</label><input type="number" id="obsWinH" value="120" min="10" max="400"></div>
       <div class="field"><label>離地 (cm)</label><input type="number" id="obsWinSill" value="90" min="0" max="400"></div>
       <div class="field" title="窗框退進牆面的深度，窗洞四周側面要貼壁磚收邊"><label>窗框內退 (cm)</label><input type="number" id="obsWinRev" value="10" min="0" max="50"></div>
+      <div class="field"><label>窗側收邊</label><select id="obsWinRevProc"><option value="none">不加工</option><option value="bevel">工廠背斜</option></select></div>
     </div>
     <div id="obsWallRow" class="row" style="display:none!important">
       <div class="field"><label>在哪面牆</label>
@@ -744,6 +716,7 @@ canvas{display:block}
       <div class="field"><label>窗高 (cm)</label><input type="number" id="editWinH" value="120" min="10" max="400"></div>
       <div class="field"><label>離地 (cm)</label><input type="number" id="editWinSill" value="90" min="0" max="400"></div>
       <div class="field" title="窗框退進牆面的深度，窗洞四周側面要貼壁磚收邊"><label>窗框內退 (cm)</label><input type="number" id="editWinRev" value="10" min="0" max="50"></div>
+      <div class="field"><label>窗側收邊</label><select id="editWinRevProc"><option value="none">不加工</option><option value="bevel">工廠背斜</option></select></div>
     </div>
     <div class="row" id="editXYRow">
       <div class="field"><label id="editXLabel">X (cm)</label><input type="number" id="editX" step="0.5"></div>
@@ -2004,7 +1977,7 @@ function addObs(){
   if(obs.type==='window'){
     obs.winH=+document.getElementById('obsWinH').value||120;
     obs.winSill=+document.getElementById('obsWinSill').value||90;
-    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);
+    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);obs.winRevProc=document.getElementById('obsWinRevProc').value;
   }
   state.obstacles.push(obs);
   renderObsList();scheduleRender();
@@ -2033,7 +2006,7 @@ function showEditBox(o){
   if(o.type==='window'){
     document.getElementById('editWinH').value=o.winH||120;
     document.getElementById('editWinSill').value=o.winSill||90;
-    document.getElementById('editWinRev').value=winRev(o);
+    document.getElementById('editWinRev').value=winRev(o);document.getElementById('editWinRevProc').value=o.winRevProc||'none';
   }
   if(isW&&document.getElementById('editWallSel'))document.getElementById('editWallSel').value=o.wall||defaultWallKey();
   if(isW)document.getElementById('editWallHint').textContent='📌 嵌於'+segLabel(o.wall||defaultWallKey())+'牆厚，X 從該牆起點（左/上端）量起';
@@ -2048,7 +2021,7 @@ function applyEdit(){
   if(o.type==='window'){
     o.winH=+document.getElementById('editWinH').value||120;
     o.winSill=+document.getElementById('editWinSill').value||90;
-    o.winRev=Math.max(0,+document.getElementById('editWinRev').value||0);
+    o.winRev=Math.max(0,+document.getElementById('editWinRev').value||0);o.winRevProc=document.getElementById('editWinRevProc').value;
   }
   if(WALL_TYPES.has(o.type)){
     o.wall=document.getElementById('editWallSel').value;o.h=p.wallT;
@@ -2080,7 +2053,7 @@ function addObsFromModal(){
   if(obs.type==='window'){
     obs.winH=+document.getElementById('obsWinH').value||120;
     obs.winSill=+document.getElementById('obsWinSill').value||90;
-    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);
+    obs.winRev=Math.max(0,+document.getElementById('obsWinRev').value||0);obs.winRevProc=document.getElementById('obsWinRevProc').value;
   }
   closeObsAddModal();
   startPlacing('obs',obs);
@@ -3926,7 +3899,7 @@ function windowReveals(){
     base.excl.filter(e=>e.type==='window'&&e.rev>0).forEach(e=>{
       const cy=(e.y1+e.y2)/2,z=zs.find(z=>cy>=z.y0&&cy<=z.y1)||zs[0];
       const w=e.x2-e.x1,h=e.y2-e.y1;
-      out.push({face:id,seg:sg,label:e.label||'窗',spec:z.spec,key:(z.spec.code&&z.spec.code!=='main')?z.spec.code:'main',D:e.rev,lens:[w,w,h,h]});
+      out.push({face:id,seg:sg,label:e.label||'窗',spec:z.spec,key:((z.spec.code&&z.spec.code!=='main')?z.spec.code:'main')+(e.revProc?'|bev':''),proc:!!e.revProc,D:e.rev,lens:[w,w,h,h]});
     });
   });
   return out;
@@ -3961,7 +3934,7 @@ function tileGroupStats(){
     const k=tileGroupKey(id,pc),g=G[k]||(G[k]={spec:pc.spec,full:0,cuts:[],faces:new Set(),all:[]});
     g.all.push({face:id,pc});g.faces.add(id);if(pc.isPartial)g.cuts.push(pc);else g.full++;});});
   const RV=revealStats();
-  Object.entries(RV).forEach(([k,r])=>{if(!G[k])G[k]={spec:r.spec,full:0,cuts:[],faces:new Set(),all:[]};G[k].reveal=r;r.wins.forEach(w=>G[k].faces.add(w.face));});
+  Object.entries(RV).forEach(([k,r])=>{if(k.includes('|'))return;if(!G[k])G[k]={spec:r.spec,full:0,cuts:[],faces:new Set(),all:[]};G[k].reveal=r;r.wins.forEach(w=>G[k].faces.add(w.face));});
   Object.values(G).forEach(g=>{g.cut=g.cuts.length;g.sources=pairCuts(g.cuts.map(c=>({...c})),0);g.plan=groupPlan(g.all,g.spec,0);g.order=Math.ceil((g.plan.base+(g.reveal?g.reveal.tiles:0))*(1+(g.spec.waste||0)/100));});
   return G;
 }
@@ -4053,7 +4026,7 @@ function wallObsExclusions(wallKey, surfW, wallHmm){
         fY2=wallHmm-sillMm;
         fY1=fY2-winHmm;
       }
-      return{x1:Math.max(0,fX),y1:Math.max(0,fY1),x2:Math.min(surfW,fX+fW),y2:Math.min(wallHmm,fY2),type:o.type,label:o.label,rev:o.type==='window'?winRev(o)*10:0,hingeL:((o.swing||'left')==='left')!==flip};
+      return{x1:Math.max(0,fX),y1:Math.max(0,fY1),x2:Math.min(surfW,fX+fW),y2:Math.min(wallHmm,fY2),type:o.type,label:o.label,rev:o.type==='window'?winRev(o)*10:0,revProc:o.type==='window'&&o.winRevProc==='bevel',hingeL:((o.swing||'left')==='left')!==flip};
     }));
 }
 
@@ -5897,55 +5870,58 @@ function tileSpecHtml(spec,items){
     (field?cell(tileIconSvg(w,h,'現場導角'),'現場導角<br>（磚片數）',field):'')+`</div>`+
     (bev.used.size?`<div style="font-size:10.5px;color:var(--muted);margin-top:5px">背斜：${bev.used.size} 個位置共用 ${bev.tiles} 片加工磚（已計入叫貨），剩料再用於其他裁切</div>`:'');
 }
-function showSummaryModal(){
-  // 地磚數量在地磚圖計算；目前不在地磚圖時先算一次
-  if(state.view!=='floor'){renderFloorView();if(state.view==='wall')renderWallView();}
-  const p=P();const d=innerDim();
-  const lnames={straight:'平貼',half:'1/2交丁（橫）',third:'1/3交丁（橫）','half-v':'1/2交丁（直）'};
-  // 地磚
-  document.getElementById('mStatFull').textContent=document.getElementById('statFull').textContent;
-  {const fc=state._floorCut||{tiles:0,pieces:0};document.getElementById('mStatCut').innerHTML=fc.tiles+'<span class="cut-src">（裁成 '+fc.pieces+' 片）</span>';}
-  document.getElementById('mStatOrder').textContent=document.getElementById('statOrder').textContent;
-  const G0=tileGroupStats();
-  document.getElementById('mSpec').innerHTML=tileSpecHtml({tileW:p.tileW,tileH:p.tileH},floorPiecesAll().map(pc=>({face:'floor',pc})));
-  document.getElementById('mNote').textContent=p.waste>0?`建議叫貨已含 ${p.waste}% 損耗`:'（損耗 0%，請依現場條件自行調整）';
-  // 壁磚（重新計算確保最新）
-  const wr=calculateWallTiles();
-  document.getElementById('mWallStatFull').textContent=wr.full;
-  document.getElementById('mWallStatCut').innerHTML=(wr.plan.base-wr.full)+'<span class="cut-src">（裁成 '+wr.cut+' 片）</span>';
-  document.getElementById('mWallStatOrder').textContent=wr.order;
-  document.getElementById('mWallSpec').innerHTML=tileSpecHtml({tileW:p.wallTileW,tileH:p.wallTileH},(G0.main&&G0.main.all)||[]);
-  document.getElementById('mWallNote').innerHTML=revealNote(wr.reveal)+(p.wallWaste>0?`建議叫貨已含 ${p.wallWaste}% 損耗`:'（損耗 0%，請依現場條件自行調整）');
-  // 嵌入式浴缸（半牆＋檯面）
-  const tr=calculateTubTiles();
-  document.getElementById('mTubBlock').innerHTML=tr.map(t=>`<div class="sum-col">
-    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 7px">嵌入式浴缸 半牆＋檯面（${t.spec.name}，${t.faces} 面）</div>
-    <div class="modal-stats">
-      <div class="modal-stat"><div class="modal-stat-l">整磚</div><div class="modal-stat-v">${t.full}</div><div class="modal-stat-u">片</div></div>
-      <div class="modal-stat"><div class="modal-stat-l">裁切用磚</div><div class="modal-stat-v" style="color:var(--warn)">${t.cutTiles}<span class="cut-src">（裁成 ${t.cut} 片）</span></div><div class="modal-stat-u">片</div></div>
-      <div class="modal-stat" style="grid-column:span 2"><div class="modal-stat-l">建議叫貨</div><div class="modal-stat-v" style="color:var(--accent)">${t.order}</div><div class="modal-stat-u">片</div></div>
-    </div>
-    <div class="modal-spec">${tileSpecHtml(t.spec,((G0['T'+t.spec.key]||{}).all)||[])}</div>
-    <div class="modal-note">未併入上方${t.spec.name}數量；同規格請相加叫貨（${t.spec.name}合計約 ${t.order+(t.spec.key==='wall'?wr.order:(+document.getElementById('mStatOrder').textContent||0))} 片）。</div></div>`).join('');
-  document.getElementById('mTubBlock').insertAdjacentHTML('afterbegin',wetBlockHtml());
-  {const cf=state._conflicts||[];document.getElementById('mConflicts').innerHTML=cf.length?`<div style="background:#FFF4E5;border:1px solid #E8B37A;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#8A4B0F"><b>⚠ 需要注意（${cf.length}）</b>${cf.map(c=>`<div style="margin-top:3px">• ${c.msg}</div>`).join('')}</div>`:'';}
-  // 特殊磚
-  const G=tileGroupStats(),lnm={straight:'平貼',half:'1/2交丁（橫）',third:'1/3交丁（橫）','half-v':'1/2交丁（直）'};
-  const faceName=id=>{const[k,a,b]=id.split(':');if(k==='seg'){const sg=getSeg(a);return sg?sg.tag:a;}return b==='deck'?'浴缸檯面':'半牆'+(TUB_EDGE_LBL[b]||'');};
-  document.getElementById('mTubBlock').innerHTML+=(state.tileTypes||[]).map(t=>{const g=G[t.code];if(!g)return'';const sp=g.spec;
-    return `<div class="sum-col"><div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;margin:0 0 7px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sp.color};margin-right:5px;vertical-align:-1px"></span>${t.code}・${sp.name}</div>
-    <div class="modal-stats">
-      <div class="modal-stat"><div class="modal-stat-l">整磚</div><div class="modal-stat-v">${g.full}</div><div class="modal-stat-u">片</div></div>
-      <div class="modal-stat"><div class="modal-stat-l">裁切用磚</div><div class="modal-stat-v" style="color:var(--warn)">${g.plan.base-g.full}<span class="cut-src">（裁成 ${g.cut} 片）</span></div><div class="modal-stat-u">片</div></div>
-      <div class="modal-stat" style="grid-column:span 2"><div class="modal-stat-l">建議叫貨</div><div class="modal-stat-v" style="color:var(--accent)">${g.order}</div><div class="modal-stat-u">片</div></div>
-    </div>
-    <div class="modal-spec">${tileSpecHtml(sp,g.all)}</div>
-    <div class="modal-note">${revealNote(g.reveal)}使用面：${[...g.faces].map(faceName).join('、')}${sp.waste?`　已含 ${sp.waste}% 損耗`:''}</div></div>`;}).join('');
-  document.getElementById('summaryModal').classList.remove('hidden');
+function sumCard(title,spec,full,cut,order,waste,sub,note){
+  const sz=spec?`${Math.round(spec.tileW)/10} × ${Math.round(spec.tileH)/10} cm`:'';
+  return`<div class="sum-col"><div class="sum-t">${title}</div>
+    ${spec?`<div class="sum-spec">${tileIconSvg(spec.tileW,spec.tileH,null)}<span>${sz}</span></div>`:''}
+    <div class="sum-eq"><div class="sum-stack">
+      <div class="sum-box"><span class="sum-l">整磚</span><span class="sum-v">${full}</span><span class="sum-u">片</span></div>
+      <div class="sum-op">＋</div>
+      <div class="sum-box"><span class="sum-l">裁切用磚</span><span class="sum-v">${cut}</span><span class="sum-u">片</span></div>
+      ${sub?`<div class="sum-sub">${sub}</div>`:''}
+    </div><div class="sum-op">＝</div>
+    <div class="sum-box sum-order"><span class="sum-l">建議叫貨</span><span class="sum-v">${order}</span><span class="sum-u">片${waste?`<br>含損耗 ${waste}%`:''}</span></div></div>
+    ${note?`<div class="modal-note" style="margin-top:8px">${note}</div>`:''}</div>`;
 }
-function revealNote(r){
-  if(!r)return'';
-  return `<div style="margin-bottom:4px;color:var(--text)">含窗洞收邊（${r.wins.length} 個窗，內退 ${r.D} cm）：${r.pieces} 段、裁 ${r.strips} 條，約 <b>${r.tiles}</b> 片磚</div>`;
+function showSummaryModal(){
+  if(state.view!=='floor'){renderFloorView();if(state.view==='wall')renderWallView();}
+  const p=P(),G=tileGroupStats(),RV=revealStats(),fac=[],cards=[];
+  const ord=(n,w)=>Math.ceil(n*(1+(w||0)/100));
+  const addFac=(spec,plan,area)=>Object.entries(plan.bev.cats).forEach(([cat,n])=>{
+    const k=spec.tileW+'x'+spec.tileH+'|'+cat,e=fac.find(f=>f.k===k);if(e){e.n+=n;e.areas.add(area);}else fac.push({k,spec,cat,n,areas:new Set([area])});});
+  const faceName=id=>{const[k,a,b]=id.split(':');if(k==='seg'){const sg=getSeg(a);return sg?sg.tag:a;}return b==='deck'?'浴缸檯面':'半牆'+(TUB_EDGE_LBL[b]||'');};
+  // 地磚
+  {const spec={tileW:p.tileW,tileH:p.tileH},gp=groupPlan(floorPiecesAll().map(pc=>({face:'floor',pc})),spec,0);
+   cards.push(sumCard('地磚',spec,gp.full,gp.sources,ord(gp.full+gp.sources,p.waste),p.waste,gp.cut?`裁成 ${gp.cut} 片`:'',''));addFac(spec,gp,'地磚');}
+  // 壁磚（各面合計）：窗側收邊直接併入（設定工廠背斜的窗改列工廠加工）
+  {const g=G.main,spec={tileW:p.wallTileW,tileH:p.wallTileH},gp=g?g.plan:{full:0,sources:0,cut:0,bev:{cats:{}}},rv=RV.main;
+   const rt=rv?rv.tiles:0,cut=gp.sources+rt;
+   cards.push(sumCard('壁磚（各面合計）',spec,gp.full,cut,ord(gp.full+cut,p.wallWaste),p.wallWaste,[gp.cut?`裁成 ${gp.cut} 片`:'',rt?`含窗側收邊 ${rt} 片（${rv.wins.length} 個窗，裁 ${rv.strips} 條）`:''].filter(Boolean).join('；'),''));
+   if(g)addFac(spec,gp,'壁磚');}
+  // 特殊磚
+  (state.tileTypes||[]).forEach(t=>{const g=G[t.code];if(!g)return;const sp=g.spec,rv=RV[t.code],rt=rv?rv.tiles:0,cut=g.plan.sources+rt;
+    cards.push(sumCard(`<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sp.color};margin-right:5px;vertical-align:-1px"></span>${t.code}・${sp.name}`,sp,g.plan.full,cut,ord(g.plan.full+cut,sp.waste),sp.waste,
+      [g.plan.cut?`裁成 ${g.plan.cut} 片`:'',rt?`含窗側收邊 ${rt} 片`:''].filter(Boolean).join('；'),`使用面：${[...g.faces].map(faceName).join('、')}`));
+    addFac(sp,g.plan,t.code+' '+sp.name);});
+  // 嵌入式浴缸
+  Object.entries(G).filter(([k])=>k.startsWith('T')).forEach(([k,g])=>{const sp=g.spec;
+    cards.push(sumCard(`嵌入式浴缸 半牆＋檯面（${sp.name||''}，${g.faces.size} 面）`,sp,g.plan.full,g.plan.sources,ord(g.plan.full+g.plan.sources,sp.waste),sp.waste,g.plan.cut?`裁成 ${g.plan.cut} 片`:'',`未併入${sp.name||'同規格'}數量，同規格請相加叫貨`));
+    addFac(sp,g.plan,'嵌入式浴缸');});
+  // 淋浴間
+  {const L=wetLayout();if(L){const w=state.wet,c=v=>Math.round(v)/10;
+    cards.push(sumCard(`淋浴間（濕區・${wetZoneType()}）`,{tileW:L.tw,tileH:L.th},0,L.tiles,L.order,w.waste,`裁成 ${L.segs.length} 段長條（${L.strips.length} 條）`,
+      `第一條 ${c(L.first)} cm${L.n?`，其餘 ${L.n} 條各 ${c(L.each)} cm`:''}；長條長 ${c(L.len)} cm`+(L.len>L.L?`（接縫${w.join==='stagger'?'交丁':'對齊'}）`:'')+'<br>'+L.groups.map(g=>`${c(g.wd)} cm 寬 ${g.pieces} 段：一片可裁 ${g.per} 條，約 ${g.tiles} 片`).join('<br>')));}}
+  document.getElementById('sumBasic').innerHTML=cards.join('');
+  // 工廠加工
+  const rows=fac.map(f=>{const sz=`${Math.round(f.spec.tileW)/10}×${Math.round(f.spec.tileH)/10}`;
+    return`<div class="fac-row">${bevelIconSvg(f.spec.tileW,f.spec.tileH,f.cat)}<div class="fac-name">${sz} cm ${f.cat}<div class="fac-area">${[...f.areas].join('、')}</div></div><div class="fac-n">${f.n}<span>片</span></div></div>`;});
+  Object.entries(RV).filter(([k])=>k.includes('|')).forEach(([k,r])=>{const sp=r.spec;
+    rows.push(`<div class="fac-row">${bevelIconSvg(sp.tileW,sp.tileH,'長單邊背斜')}<div class="fac-name">${Math.round(sp.tileW)/10}×${Math.round(sp.tileH)/10} cm 窗側收邊條（寬 ${r.D} cm，單邊背斜）<div class="fac-area">${r.wins.length} 個窗：${r.pieces} 段、裁 ${r.strips} 條</div></div><div class="fac-n">${r.tiles}<span>片</span></div></div>`);});
+  let field=0;allFaceIds().concat(['floor']).forEach(id=>facePiecesAny(id).forEach(pc=>{if(pieceProcTypes(id,pc).has('現場導角'))field++;}));
+  document.getElementById('sumFactory').innerHTML=(rows.length?rows.join(''):'<div class="info-tip">目前沒有標記「工廠背斜切」的磚。</div>')+
+    (field?`<div class="info-tip" style="margin-top:6px">現場導角：${field} 片磚（現場處理，已含在上方數量內）</div>`:'');
+  {const cf=state._conflicts||[];document.getElementById('mConflicts').innerHTML=cf.length?`<div style="background:#FFF4E5;border:1px solid #E8B37A;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#8A4B0F"><b>⚠ 需要注意（${cf.length}）</b>${cf.map(c=>`<div style="margin-top:3px">• ${c.msg}</div>`).join('')}</div>`:'';}
+  document.getElementById('summaryModal').classList.remove('hidden');
 }
 function closeSummaryModal(){document.getElementById('summaryModal').classList.add('hidden');}
 
