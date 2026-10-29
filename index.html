@@ -5410,7 +5410,7 @@ function build3D(){
       // 只有貼磚的外露面內縮；靠牆那側做滿，剖開時整支柱子都是灰色（也蓋過伸進柱子裡的浴缸裙邊）
       const fsg=ci.faces.map(k=>smC.segs.find(sg=>sg.key===k)).filter(Boolean),on=(ax,c)=>fsg.some(f=>f.axis===ax&&Math.abs(f.c-c)<1);
       const k=0.3,ix1=b.x1/10+(on('v',b.x1)?k:0),ix2=b.x2/10-(on('v',b.x2)?k:0),iz1=b.y1/10+(on('h',b.y1)?k:0),iz2=b.y2/10-(on('h',b.y2)?k:0);
-      const core=new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.1,ix2-ix1),H-0.2,Math.max(0.1,iz2-iz1)),new THREE.MeshLambertMaterial({color:0x6E7274,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+      const core=new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.1,ix2-ix1),H-0.2,Math.max(0.1,iz2-iz1)),new THREE.MeshLambertMaterial({color:0x6E7274}));
       core.position.set((ix1+ix2)/2,H/2,(iz1+iz2)/2);g.add(core);
     }
     root.add(g);V3.attached.push({obj:g,walls:ci.faces});
@@ -5629,12 +5629,12 @@ function makeBuiltinTub3D(s,Ht){
   const faces=tubFaces().filter(f=>f.s===s);
   const cs=1,sn=0; // 浴缸以平面方向建模，不旋轉
   const edgeOf=(lx,lz)=>{const x=Math.round(lx*cs-lz*sn),y=Math.round(lx*sn+lz*cs);return x===1?'e':x===-1?'w':y===1?'s':'n';};
-  const cutMat=new THREE.MeshBasicMaterial({color:0x8E877D}); // 靠牆的面（前方牆隱藏時看到的是剖面）
+  const cutMat=new THREE.MeshBasicMaterial({color:0x8E877D,polygonOffset:true,polygonOffsetFactor:3,polygonOffsetUnits:3}); // 靠牆的面（前方牆隱藏時看到的是剖面）
   const faceMat=(lx,lz)=>{
     const f=faces.find(f=>f.kind==='apron'&&f.edge===edgeOf(lx,lz));
     if(!f)return cutMat;
     const cv=offscreenSurface(f.w,f.h,sc=>drawTubFaceSurface(f,0,0,sc));
-    return new THREE.MeshBasicMaterial({map:texFrom(cv)});
+    return new THREE.MeshBasicMaterial({map:texFrom(cv),polygonOffset:true,polygonOffsetFactor:3,polygonOffsetUnits:3});
   };
   // 裙邊（不畫頂面，讓缸體看得到）
   const ag=new THREE.BoxGeometry(W,Ht,D);
