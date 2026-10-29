@@ -82,8 +82,8 @@ input:focus,select:focus{border-color:var(--accent)}
 canvas{display:block}
 .li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
 .ls{width:13px;height:13px;border-radius:2px;border:1px solid rgba(0,0,0,.1)}
-.tile-legend{position:absolute;left:12px;top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:calc(100% - 260px);padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.82);border:1px solid var(--border);pointer-events:none}.tile-legend:empty{display:none}.tile-legend .note{font-size:10px;color:var(--faint,#9AA)}.tile-legend .li{white-space:nowrap}
-.lsw{width:14px;height:14px;border-radius:2px;border:1px solid rgba(0,0,0,.18);flex:none}.tile-legend .li{gap:3px}.tile-legend .lt{margin-left:3px}
+.tile-legend{position:absolute;left:12px;top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:calc(100% - 260px);padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.82);border:1px solid var(--border);pointer-events:none}.tile-legend:empty{display:none}.tile-legend .note{font-size:11px;color:var(--muted)}.tile-legend .li{white-space:nowrap}
+.lsw{width:16px;height:16px;border-radius:2px;border:1px solid rgba(0,0,0,.18);flex:none}.tile-legend .li{gap:3px}.tile-legend .lt{margin-left:3px}
 .mode-btn{font-size:11px;padding:4px 10px;border-radius:var(--r);border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);transition:all .15s;font-family:var(--sans)}
 .mode-btn:hover{background:var(--surface2)}
 .mode-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -939,12 +939,12 @@ function setMainColor_floor(c){setMainColor('floor',c);}function setMainColor_wa
 function setTtColor(c){const t=ttList(_ttEdit).find(t=>t.code===_ttEdit);if(!t)return;t.color=c;renderSwatches();ttApply();}
 // 圖例：列出目前畫面上用到的磚種（左上＝整磚、右下＝裁切）
 function legendSpecs(){
-  const out=[],add=sp=>{if(sp&&sp.color&&!out.some(o=>o.name===sp.name&&o.color===sp.color))out.push({name:sp.name,color:sp.color,strip:!!sp.strip});};
+  const out=[];let cat='floor';const add=sp=>{if(sp&&sp.color&&!out.some(o=>o.name===sp.name&&o.color===sp.color))out.push({name:sp.name,color:sp.color,strip:!!sp.strip,cat:sp.key==='floor'&&cat!=='floor'?'floor':cat});};
   const v=state.view;if(!state.spaceDone)return out;
   if(v==='floor'||v==='unfold'){const FA=floorAll();
     if(FA.G&&FA.G.main&&FA.G.main.items&&FA.G.main.items.length)add(floorMainSpec());
     (FA.zl||[]).forEach(r=>{if(r.strip)add({...r.spec,strip:true});else if((FA.zp||[]).some(pc=>pc.zone===r.z.id))add(r.spec);});}
-  if(v==='wall'||v==='unfold'){
+  if(v==='wall'||v==='unfold'){cat='wall';
     const ids=v==='wall'?(state._wHits||[]).filter(h=>h.kind==='seg').map(h=>'seg:'+h.seg.key):wallSegs(P(),innerDim()).map(sg=>'seg:'+sg.key);
     ids.forEach(id=>facePieces(id).forEach(pc=>add(pc.spec&&pc.spec.code==='main'&&!pc.spec.color?{...pc.spec,color:mainColor('wall')}:{...pc.spec,name:pc.spec.code==='main'?tileName('wall'):pc.spec.name})));
     if(v==='unfold')tubFaces().forEach(f=>add({...f.spec,name:f.spec.key==='floor'?tileName('floor'):tileName('wall')}));}
@@ -956,8 +956,9 @@ function updateLegend(){
   let L=[];try{L=legendSpecs();}catch(e){L=[];}
   const sig=JSON.stringify(L)+(state.showCut!==false);if(sig===_legSig)return;_legSig=sig;
   const cut=state.showCut!==false;
-  const sw=c=>`<span class="lsw" style="background:${c}"></span>`,cutL=L.filter(t=>!t.strip);
-  el.innerHTML=L.length?`<span class="li">${L.map(t=>sw(t.color)).join('')}<span class="lt">整磚</span></span>`+(cut&&cutL.length?`<span class="li">${cutL.map(t=>sw(shadeHex(t.color,CUT_SHADE))).join('')}<span class="lt">裁切</span></span>`:''):'';
+  const sw=t=>`<span class="lsw" title="${escH(t.name)}" style="background:${t.strip||!cut?t.color:`linear-gradient(135deg,${t.color} 0 50%,${shadeHex(t.color,CUT_SHADE)} 50% 100%)`}"></span>`;
+  const grp=(c,lb)=>{const a=L.filter(t=>t.cat===c);return a.length?`<span class="li">${a.map(sw).join('')}<span class="lt">${lb}</span></span>`:'';};
+  el.innerHTML=L.length?(cut?'<span class="note">淺色整磚・深色裁切</span>':'')+grp('floor','地磚')+grp('wall','壁磚'):'';
 }
 function toggleShowDims(on){state.showDims=on;scheduleRender();}
 document.addEventListener('click',()=>{['dispPop','cfPop'].forEach(id=>{const p=document.getElementById(id);if(p)p.classList.remove('open');});});
