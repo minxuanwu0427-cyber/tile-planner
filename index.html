@@ -565,8 +565,9 @@ canvas{display:block}
     </div>
     <div class="field" style="margin-bottom:8px"><label>圖面顏色<small class="sw-note">左上＝整磚・右下＝裁切磚</small></label><div class="swatches" id="ttSwatches"></div></div>
     <div class="row" id="ttModeRow" style="display:none">
-      <div class="field"><label>鋪法</label><select id="ttMode" onchange="ttApply()"><option value="normal">一般鋪貼</option><option value="strip">依尺寸裁長條（淋浴間止滑）</option></select></div>
+      <div class="field"><label>鋪法</label><select id="ttMode" onchange="ttApply();ttStripNote()"><option value="normal">一般鋪貼</option><option value="strip">依尺寸裁長條（淋浴間止滑）</option></select></div>
     </div>
+    <div id="ttStripNote" class="info-tip" style="display:none;margin:-2px 0 8px">長條的方向、第一條寬、條數（後面均分每條幾 cm）在「分區設定」的地面區域裡調整。<button class="btn btn-sm" style="margin-left:4px" onclick="closeTileTypeModal(false);openZed('floor')">開啟分區設定</button></div>
     <div class="row">
       <div class="field"><label>磚長 (cm)</label><input type="number" id="ttW" step="0.1" min="1" oninput="ttApply()"></div>
       <div class="field"><label>磚寬 (cm)</label><input type="number" id="ttH" step="0.1" min="1" oninput="ttApply()"></div>
@@ -3024,7 +3025,7 @@ function updateConflicts(){
 }
 function render(){
   state._orgMarks=null;if(typeof V3!=='undefined'){V3._pairIdx=null;if(V3.pairObj&&V3.pairObj.visible&&V3._pairKey){const k=V3.pairLock||V3._pairKey,l=V3._pairLb;setTimeout(()=>{try{if(V3.pairObj&&V3.pairObj.visible)showPair(k,l);}catch(e){}},0);}}
-  setTimeout(()=>{try{updateLegend();}catch(e){}},0);
+  setTimeout(()=>{try{updateLegend();}catch(e){}try{const sig=JSON.stringify((state.floorTypes||[]).filter(t=>t.mode==='strip').map(t=>stripSummary(t.code)));if(sig!==render._ss){render._ss=sig;refreshTileSummary();}}catch(e){}},0);
   // 有分切線的面先補齊各區 area（之後的排磚與起鋪點都以區為單位）
   try{if(state.spaceDone)Object.keys(state.splits||{}).forEach(id=>{const sp=state.splits[id];if(sp&&(sp.lines||[]).length&&(id==='floor'||(id.startsWith('seg:')&&getSeg(id.slice(4)))))faceIsSplit(id);});}catch(e){}
   histSchedule();refreshTileSummary();enforceTubInside();updateConflicts();
@@ -3919,13 +3920,19 @@ function tileItemHtml(color,wmm,hmm,name,size,dim,actions){
     ${actions?`<div class="item-actions">${actions}</div>`:''}</div>`;
 }
 function toggleTileSb(id){toggleSb(id);}
+// 側欄：長條區的第一條寬＋其餘均分寬
+function stripSummary(code){
+  try{if(!state.spaceDone)return'';const out=[];floorZoneList().forEach(zr=>{if(!zr.strip||zr.spec.code!==code)return;const L=stripLayout(zr,[]),cm=v=>Math.round(v)/10;
+    out.push(`<div style="color:var(--accent);margin-top:2px">${escH(zr.z.name||'區域')}：第一條 ${cm(L.first)} cm＋${L.n} 條 × ${cm(L.each)} cm</div>`);});
+    return out.join('');}catch(e){return'';}
+}
 function refreshTileSummary(){
   const f=document.getElementById('floorTileSummary'),w=document.getElementById('wallTileSummary');if(!f||!w)return;
   const p=_Praw(),dim=(g,lay,ws)=>`縫 ${g} mm・${LAYOUT_NAME[lay]||lay}・損耗 ${ws}%`;
   const ed=fn=>`<button class="icon-btn" title="編輯" onclick="${fn}">✎</button>`,noDel=`<button class="icon-btn" title="預設磚不能刪除" disabled style="opacity:.35;cursor:default">✕</button>`;
   f.innerHTML=tileItemHtml(mainColor('floor'),p.tileW,p.tileH,tileName('floor'),`${p.tileW/10} × ${p.tileH/10} cm`,dim(p.grout,p.layout,p.waste),ed("showTileModal('floor')")+noDel)+
     (state.floorTypes||[]).map(t=>tileItemHtml(t.color||TILE_DOT.wet,(+t.w||60)*10,(+t.h||60)*10,t.name||t.code,`${t.w} × ${t.h} cm`,
-      (t.mode==='strip'?'依尺寸裁長條・':'')+dim(t.grout,t.layout,t.waste||0),ed(`openTileTypeModal('${t.code}')`)+`<button class="icon-btn" title="刪除" onclick="delTileType('${t.code}')">✕</button>`)).join('');
+      (t.mode==='strip'?'依尺寸裁長條・':'')+dim(t.grout,t.layout,t.waste||0)+(t.mode==='strip'?stripSummary(t.code):''),ed(`openTileTypeModal('${t.code}')`)+`<button class="icon-btn" title="刪除" onclick="delTileType('${t.code}')">✕</button>`)).join('');
   w.innerHTML=tileItemHtml(mainColor('wall'),p.wallTileW,p.wallTileH,tileName('wall'),`${p.wallTileW/10} × ${p.wallTileH/10} cm`,dim(p.wallGrout,p.wallLayout,p.wallWaste),ed("showTileModal('wall')")+noDel);
 }
 // ---- 分區編輯（地面＋各面牆）：畫「分切線」把面切成區域，再選各區用哪一種磚 ----
@@ -3992,7 +3999,7 @@ function zedPanel(){
     let c=`<div class="zed-card${isSel?' sel':''}" onclick="zedPick2(${r.rects[0].x1+0.01},${r.rects[0].y1+0.01})"><div class="zed-h"><span class="tile-dot" style="background:${zedColor(face,code)};border-radius:2px"></span>`;
     c+=a?`<input type="text" value="${escH(a.name||'')}" onclick="event.stopPropagation()" oninput="zedSetArea(${a.id},'name',this.value,0)" style="flex:1;min-width:0;padding:3px 6px">`:`<span style="flex:1;font-size:12px">${escH(nm)}</span>`;
     c+=`</div><div class="field" style="margin-top:5px" onclick="event.stopPropagation()"><select onchange="zedSetTile(${ri},this.value)">${tiles.map(t=>opt(t.code,escH(t.name),code)).join('')}</select></div>`;
-    if(isSel&&a&&face==='floor'){const zl=floorZoneList(),zr=zl.find(q=>q.z===a);
+    if(a&&face==='floor'){const zl=floorZoneList(),zr=zl.find(q=>q.z===a);
       if(zr&&zr.strip){const L=stripLayout(zr,[]),cm=v=>Math.round(v)/10,hz=wetHoriz(zr,a);
         c+=`<div onclick="event.stopPropagation()"><div class="row" style="margin-top:6px">
           <div class="field"><label>長條方向</label><select onchange="zedSetArea(${a.id},'dir',this.value,1)">${opt('short','平行短邊',a.dir||'short')}${opt('long','平行長邊',a.dir)}</select></div>
@@ -4181,8 +4188,9 @@ function openTileTypeModal(code,isNew){
   document.getElementById('ttLayout').value=t.layout||'straight';document.getElementById('ttWaste').value=t.waste||0;
   document.getElementById('ttCancel').style.display=isNew?'':'none';
   document.getElementById('ttDel').style.display=isNew?'none':'';
-  document.getElementById('ttModal').classList.remove('hidden');
+  document.getElementById('ttModal').classList.remove('hidden');ttStripNote();
 }
+function ttStripNote(){const n=document.getElementById('ttStripNote'),m=document.getElementById('ttMode');if(n)n.style.display=String(_ttEdit).startsWith('F')&&m&&m.value==='strip'?'':'none';}
 function ttApply(){
   const t=ttList(_ttEdit).find(t=>t.code===_ttEdit);if(!t)return;
   if(String(_ttEdit).startsWith('F')){const m=document.getElementById('ttMode').value;
