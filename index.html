@@ -841,8 +841,9 @@ canvas{display:block}
           <label><input type="checkbox" id="showCutChk" checked onchange="toggleShowCut(this.checked)"><span>標示裁切磚<small>取消時所有磚面同色</small></span></label>
           <label><input type="checkbox" id="showNumChk" checked onchange="toggleShowNum(this.checked)"><span>磚片編號<small>地磚圖、壁磚圖、3D</small></span></label>
           <label><input type="checkbox" id="showDimChk" checked onchange="toggleShowDims(this.checked)"><span>尺寸標註<small>地磚圖、壁磚圖</small></span></label>
+          <label><input type="checkbox" id="showProcChk" checked onchange="state.showProcs=this.checked;scheduleRender()"><span>加工標記<small>工廠背斜、現場導角（加工標記模式中一律顯示）</small></span></label>
           <div class="sep"></div>
-          <label><input type="checkbox" id="showDecorChk2" checked onchange="toggleShowDecor(this.checked)"><span>圖面完整度設備<small>馬桶、鏡櫃、浴櫃、獨立浴缸（不影響計算）</small></span></label>
+          <label><input type="checkbox" id="showDecorChk2" checked onchange="toggleShowDecor(this.checked)"><span>圖面完整度設備<small>馬桶、鏡櫃、浴櫃、浴缸、龍頭（不影響計算）</small></span></label>
         </div>
       </div>
     </div>
@@ -914,7 +915,7 @@ const OBS_COLORS={door:'#C8D8E8',window:'#D4E8D4',pipe:'#E8E0D0',column:'#D0D0D0
 const OBS_DEF={door:{w:90},window:{w:90},pipe:{w:20,h:20},column:{w:20,h:20},bathtub:{w:80,h:150}};
 const OBS_LBL={door:'門',window:'窗',pipe:'管道間',column:'柱',bathtub:'崁入浴缸'};
 const WALL_TYPES=new Set(['door','window']);
-const PROC_COLORS={'工廠背斜':'#E24B4A','現場導角':'#8E3FE0'};
+const PROC_COLORS={'工廠背斜':'#E24B4A','現場導角':'#0A84FF'};
 
 const STICKER_DEFAULTS={
   toilet:{w:40,h:65,label:'馬桶'},
@@ -2618,7 +2619,9 @@ function drawProcPreview(x1,y1,x2,y2,face,e){
   ctx.restore();
 }
 // 在一個面上畫已標記的加工（X,Y＝面左上角畫布座標）
+function procsShown(){return state.showProcs!==false||state.mode==='proc';}
 function drawFaceProcs(face,X,Y,PXv){
+  if(!procsShown())return;
   (state.procs||[]).filter(pr=>procFace(pr)===face).forEach(pr=>{
     const col=PROC_COLORS[pr.type]||'#E24B4A',x1=X+pr.x1*PXv,y1=Y+pr.y1*PXv,x2=X+pr.x2*PXv,y2=Y+pr.y2*PXv;
     ctx.save();ctx.strokeStyle=col;ctx.lineCap='round';ctx.lineWidth=state._px?Math.max(4.5,37*PXv):3;ctx.setLineDash([]);
@@ -3347,7 +3350,7 @@ function renderFloorView(){
   drawDeckOnFloor(tx,ty,wtmm,PX);
 
   // Proc marks
-  state.procs.filter(pr=>procFace(pr)==='floor').forEach(proc=>{
+  (procsShown()?state.procs:[]).filter(pr=>procFace(pr)==='floor').forEach(proc=>{
     const col=PROC_COLORS[proc.type]||'#E24B4A';
     ctx.strokeStyle=col;ctx.lineWidth=3;ctx.setLineDash([]);
     const [x1,y1]=toCanvas(wtmm+proc.x1,wtmm+proc.y1);
