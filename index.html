@@ -914,7 +914,7 @@ const OBS_COLORS={door:'#C8D8E8',window:'#D4E8D4',pipe:'#E8E0D0',column:'#D0D0D0
 const OBS_DEF={door:{w:90},window:{w:90},pipe:{w:20,h:20},column:{w:20,h:20},bathtub:{w:80,h:150}};
 const OBS_LBL={door:'門',window:'窗',pipe:'管道間',column:'柱',bathtub:'崁入浴缸'};
 const WALL_TYPES=new Set(['door','window']);
-const PROC_COLORS={'工廠背斜':'#E24B4A','現場導角':'#2B6CC4'};
+const PROC_COLORS={'工廠背斜':'#E24B4A','現場導角':'#8E3FE0'};
 
 const STICKER_DEFAULTS={
   toilet:{w:40,h:65,label:'馬桶'},
@@ -2621,7 +2621,7 @@ function drawProcPreview(x1,y1,x2,y2,face,e){
 function drawFaceProcs(face,X,Y,PXv){
   (state.procs||[]).filter(pr=>procFace(pr)===face).forEach(pr=>{
     const col=PROC_COLORS[pr.type]||'#E24B4A',x1=X+pr.x1*PXv,y1=Y+pr.y1*PXv,x2=X+pr.x2*PXv,y2=Y+pr.y2*PXv;
-    ctx.save();ctx.strokeStyle=col;ctx.lineCap='round';ctx.lineWidth=state._px?Math.max(3,25*PXv):3;ctx.setLineDash([]);
+    ctx.save();ctx.strokeStyle=col;ctx.lineCap='round';ctx.lineWidth=state._px?Math.max(4.5,37*PXv):3;ctx.setLineDash([]);
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
     if(!state._px){const mx=(x1+x2)/2,my=(y1+y2)/2,dx=x2-x1,dy=y2-y1,l=Math.hypot(dx,dy)||1;
       ctx.fillStyle=col;ctx.font='bold 9px DM Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
