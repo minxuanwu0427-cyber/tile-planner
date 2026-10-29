@@ -196,6 +196,9 @@ canvas{display:block}
 .ob-lock{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:var(--muted)}
 .ob-lock.on{color:#C2560F;background:#FFF1E6;border:1px solid #F3C39E;border-radius:4px;padding:2px 4px 2px 7px}
 .ob-lock button{border:none;background:none;color:#C2560F;cursor:pointer;font-size:12px;padding:0 3px}
+.strip-ed{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:5px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;background:#FAFBFB;font-size:11px;color:var(--muted)}
+.strip-ed label{display:flex;align-items:center;gap:3px}.strip-ed input{width:46px;padding:2px 4px;font-size:11px;text-align:center;flex:none}
+.strip-ed .icon-btn{width:20px;height:20px;font-size:12px}.strip-zn{font-weight:600;color:var(--accent);width:100%}.strip-each{font-family:var(--mono);font-weight:600;color:var(--accent)}.strip-each.warn{color:#C0392B}
 </style>
 </head>
 <body>
@@ -358,6 +361,18 @@ canvas{display:block}
       </button>
       <button class="sticker-btn" style="padding:6px 3px;font-size:10px" onclick="addSticker('bathroomCab',{basins:2})">
         <svg width="26" height="26" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 2px"><path d="M8 9 V5.5 H11.5"/><path d="M22 9 V5.5 H25.5"/><path d="M2 12 H30"/><path d="M4.5 12 Q4.5 15.5 9 15.5 Q13.5 15.5 13.5 12" fill="currentColor" fill-opacity=".15"/><path d="M18.5 12 Q18.5 15.5 23 15.5 Q27.5 15.5 27.5 12" fill="currentColor" fill-opacity=".15"/><rect x="3" y="12" width="26" height="15" rx="1"/><line x1="16" y1="16.5" x2="16" y2="27"/><line x1="14" y1="20" x2="14" y2="23"/><line x1="18" y1="20" x2="18" y2="23"/></svg>雙盆浴櫃
+      </button>
+      <button class="sticker-btn" style="padding:6px 3px;font-size:10px" onclick="addWallSticker('showerRain')">
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 2px"><path d="M13 27 V4 H21"/><rect x="16" y="3.5" width="12" height="2.2" rx=".8" fill="currentColor"/><rect x="9" y="25" width="9" height="3.5" rx="1"/><path d="M15 14 L17 10"/><rect x="16.2" y="6.5" width="3" height="4.5" rx="1"/></svg>淋浴龍頭<br>（花灑）
+      </button>
+      <button class="sticker-btn" style="padding:6px 3px;font-size:10px" onclick="addWallSticker('showerPlain')">
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 2px"><rect x="10" y="22" width="12" height="4" rx="1.2"/><path d="M14 22 V20 M18 22 V20"/><rect x="14.5" y="4" width="4" height="7" rx="1.4"/><path d="M16.5 11 V15 C16.5 19 11 19 11 22" stroke-dasharray="1.6 1.6"/></svg>淋浴龍頭
+      </button>
+      <button class="sticker-btn" style="padding:6px 3px;font-size:10px" onclick="addSticker('tubStand')">
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 2px"><path d="M13 28 V6 C13 4.5 14 4 15.5 4 H22"/><path d="M10 28.5 H17"/><path d="M19 14 V8 M19 8 H20.5"/><path d="M13 16 H10"/></svg>浴缸龍頭<br>（直立）
+      </button>
+      <button class="sticker-btn" style="padding:6px 3px;font-size:10px" onclick="addSticker('tubDeck')">
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 2px"><path d="M2 25 H30"/><path d="M5 25 V15 H12"/><path d="M14 25 V20 H17"/><path d="M20 25 V20 H23"/><path d="M27 25 V16"/><ellipse cx="27" cy="12.5" rx="3" ry="3.6"/></svg>浴缸龍頭<br>（檯面）
       </button>
       <button class="sticker-btn" style="padding:6px 3px;font-size:10px" onclick="addSticker('freeTub')">
         <svg width="26" height="26" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 2px"><path d="M2.5 13 H29.5"/><path d="M3.5 13 C3.5 22 7 26 11 26 H21 C25 26 28.5 22 28.5 13" fill="currentColor" fill-opacity=".1"/><path d="M5 15.5 H27" stroke-width=".9"/><path d="M26 13 V5 H21.5 V7"/><line x1="10" y1="26" x2="9" y2="28.5"/><line x1="22" y1="26" x2="23" y2="28.5"/></svg>獨立浴缸
@@ -911,6 +926,10 @@ const STICKER_DEFAULTS={
   wallWater:{w:2.2,h:2.2,label:'壁給水',wallOnly:true,sill:55},
   soilPipe:{w:11.4,h:11.4,label:'糞管'},
   mirrorCab:{w:60,h:60,label:'鏡櫃',wallOnly:true,sill:150},
+  showerRain:{w:25,h:125,label:'淋浴龍頭（花灑）',wallOnly:true,sill:90},
+  showerPlain:{w:20,h:65,label:'淋浴龍頭',wallOnly:true,sill:90},
+  tubStand:{w:20,h:20,label:'浴缸龍頭（直立）'},
+  tubDeck:{w:45,h:14,label:'浴缸龍頭（檯面）'},
 };
 
 let renderTimer=null;
@@ -965,7 +984,7 @@ function toggleShowDims(on){state.showDims=on;scheduleRender();}
 document.addEventListener('click',()=>{['dispPop','cfPop'].forEach(id=>{const p=document.getElementById(id);if(p)p.classList.remove('open');});});
 function toggleShowNum(on){state.showNum=on;scheduleRender();}
 function toggleShowCut(on){state.showCut=on;scheduleRender();}
-const DECOR_TYPES=new Set(['toilet','bathroomCab','mirrorCab','freeTub']);
+const DECOR_TYPES=new Set(['toilet','bathroomCab','mirrorCab','freeTub','showerRain','showerPlain','tubStand','tubDeck']);
 function isDecor(s){return DECOR_TYPES.has(s.type);}
 function stkShown(s){if(isDecor(s)&&state.mode==='origin'&&(state.view==='floor'||state.view==='wall'))return false;return !isDecor(s)||state.showDecor!==false||s._placing;}
 function toggleShowDecor(on){state.showDecor=on;updateDecorEye();renderStickerList();scheduleRender();}
@@ -2335,8 +2354,9 @@ function showStickerEditBox(s){
   document.getElementById('stTubBox').style.display=s.type==='bathtub'?'block':'none';
   if(s.type==='bathtub')fillTubBox(s);
   if(s.type==='bathroomCab')document.getElementById('stBasins').value=String(s.basins===2?2:1);
-  document.getElementById('stElevRow').style.display=(s.type==='toilet'||s.type==='freeTub')?'flex':'none';
-  if(s.type==='toilet'||s.type==='bathtub'||s.type==='freeTub')document.getElementById('stElevH').value=stkHeight(s);
+  const elevT=['toilet','freeTub','tubStand','tubDeck'].includes(s.type);document.getElementById('stElevRow').style.display=elevT?'flex':'none';
+  {const lb=document.querySelector('#stElevRow label');if(lb)lb.textContent=s.type==='tubDeck'?'安裝檯面高度 (cm)':'高度 (cm)';}
+  if(elevT||s.type==='bathtub')document.getElementById('stElevH').value=stkHeight(s);
   if(isWallOnly)document.getElementById('stDepth3').value=stkDepth(s);
   updateAutoWallInfo(s);
   // Floor fields
@@ -2428,7 +2448,7 @@ function applyStickerEdit(){
       s.wallH=Math.max(1,+document.getElementById('stWallH').value||s.wallH||80);
       s.lift=Math.max(0,+document.getElementById('stLift').value||0);
     }
-    if(s.type==='toilet'||s.type==='bathtub'||s.type==='freeTub'){
+    if(['toilet','bathtub','freeTub','tubStand','tubDeck'].includes(s.type)){
       const v=+document.getElementById(s.type==='bathtub'?'stTubH':'stElevH').value;if(v>0)s.elevH=v;
     }
     if(s.type==='bathroomCab')s.basins=+document.getElementById('stBasins').value===2?2:1;
@@ -2743,6 +2763,14 @@ function drawStickerSymbol(c,s,px,py,pw,ph){
     const R=Math.min(pw,ph)/2;
     c.beginPath();c.arc(px+pw/2,py+ph/2,R*0.96,0,Math.PI*2);c.stroke();
     c.fillStyle='rgba(62,66,70,.45)';c.beginPath();c.arc(px+pw/2,py+ph/2,R*0.86,0,Math.PI*2);c.fill();
+  } else if(type==='tubStand'){
+    const r=Math.min(pw,ph)/2;c.beginPath();c.arc(px+pw/2,py+ph/2,r*0.8,0,Math.PI*2);c.stroke();
+    c.beginPath();c.arc(px+pw/2,py+ph/2,r*0.25,0,Math.PI*2);c.fill();
+    c.lineWidth=2;c.beginPath();c.moveTo(px+pw/2,py+ph/2);c.lineTo(px+pw/2,py+ph*0.98);c.stroke();
+  } else if(type==='tubDeck'){
+    const r=Math.min(ph*0.32,pw*0.08),cy=py+ph*0.35;
+    [0.13,0.38,0.66,0.88].forEach((f,i)=>{c.beginPath();c.arc(px+pw*f,cy,i===3?r*1.4:r,0,Math.PI*2);c.stroke();});
+    c.lineWidth=2;c.beginPath();c.moveTo(px+pw*0.13,cy);c.lineTo(px+pw*0.13,py+ph*0.95);c.stroke();
   } else if(type==='drain'){
     const m=Math.min(pw,ph)*0.06;
     c.strokeRect(px+m,py+m,pw-2*m,ph-2*m);
@@ -2768,6 +2796,18 @@ function drawWallStickerSymbol(c,s,px,py,pw,ph){
     c.fillStyle='rgba(205,214,222,.35)';c.fillRect(px,py,pw,ph);
     c.strokeStyle=ink;c.lineWidth=1.2;c.setLineDash([4,2]);c.strokeRect(px,py,pw,ph);c.setLineDash([]);
     c.lineWidth=0.9;c.beginPath();c.moveTo(px+pw/3,py);c.lineTo(px+pw/3,py+ph);c.stroke();
+  } else if(type==='showerRain'||type==='showerPlain'){
+    c.strokeStyle=ink;c.fillStyle='rgba(185,192,198,.35)';c.lineWidth=1.2;c.setLineDash([]);
+    const k=ph/(s.h||1),mh=Math.max(3,6*k),mw=Math.min(pw*0.9,18*k),cx=px+pw/2,my=py+ph-mh;
+    c.fillRect(cx-mw/2,my,mw,mh);c.strokeRect(cx-mw/2,my,mw,mh);
+    if(type==='showerRain'){
+      c.beginPath();c.moveTo(cx,my);c.lineTo(cx,py+2*k);c.stroke();
+      c.fillRect(px,py,pw,Math.max(2,2*k));c.strokeRect(px,py,pw,Math.max(2,2*k));
+      const hy=my-ph*0.42;c.beginPath();c.moveTo(cx+2*k,hy);c.lineTo(cx+3*k,hy-14*k);c.stroke();c.strokeRect(cx+1.5*k,hy-20*k,4*k,7*k);
+    } else {
+      const hy=py+4*k;c.strokeRect(cx-2.5*k,hy,5*k,9*k);c.beginPath();c.moveTo(cx,hy+9*k);c.lineTo(cx,hy+24*k);c.stroke();
+      c.setLineDash([2,2]);c.beginPath();c.moveTo(cx,hy+24*k);c.quadraticCurveTo(cx-6*k,my-4*k,cx-mw/4,my);c.stroke();c.setLineDash([]);
+    }
   } else if(type==='bathroomCab'){
     // 立面：櫃體（虛線）＋上方面盆檯＋龍頭
     c.fillStyle='rgba(196,199,202,.28)';c.fillRect(px,py,pw,ph);
@@ -2803,7 +2843,7 @@ function drawWallStickerSymbol(c,s,px,py,pw,ph){
 
 // ---- 設備：地磚 / 壁磚 / 3D 同步 ----
 // 地面設備的高度（立面與 3D 用）
-const STK_H_DEF={toilet:47,bathtub:55,freeTub:58,bathroomCab:80,drain:0};
+const STK_H_DEF={toilet:47,bathtub:55,freeTub:58,bathroomCab:80,drain:0,tubStand:95,tubDeck:58};
 // 壁面設備凸出牆面的深度（平面投影與 3D 用）
 // 管徑快選（外徑 cm）：第一個為預設，糞管預設 4 吋
 const PIPE_SPECS={wallWater:[['4分',2.2],['6分',2.7]],wallDrain:[['1吋半',4.8],['2吋',6.0]],soilPipe:[['3吋',8.9],['4吋',11.4]]};
@@ -2828,7 +2868,7 @@ function applySoilDist(it,px,pz,key){
   it.x=r05(Math.max(0,Math.min(d.iw-it.w,px-it.w/2)));
   it.y=r05(Math.max(0,Math.min(d.ih-it.h,pz-it.h/2)));
 }
-const STK_DEPTH_DEF={mirrorCab:15,wallDrain:5,wallWater:5};
+const STK_DEPTH_DEF={mirrorCab:15,wallDrain:5,wallWater:5,showerRain:38,showerPlain:12};
 function stkHeight(s){
   if(s.type==='bathroomCab')return s.wallH||STK_H_DEF.bathroomCab;
   return s.elevH!=null?s.elevH:(STK_H_DEF[s.type]||0);
@@ -3920,10 +3960,15 @@ function tileItemHtml(color,wmm,hmm,name,size,dim,actions){
     ${actions?`<div class="item-actions">${actions}</div>`:''}</div>`;
 }
 function toggleTileSb(id){toggleSb(id);}
-// 側欄：長條區的第一條寬＋其餘均分寬
+function stripSet(aid,k,v){const a=(splitsOf('floor').areas||[]).find(a=>String(a.id)===String(aid));if(!a||!(v>0))return;a[k]=v;render._ss=null;scheduleRender();if(typeof zedOpen==='function'&&zedOpen())zedChanged(true);}
+// 側欄：長條區的第一條寬＋其餘均分寬（可直接改）
 function stripSummary(code){
   try{if(!state.spaceDone)return'';const out=[];floorZoneList().forEach(zr=>{if(!zr.strip||zr.spec.code!==code)return;const L=stripLayout(zr,[]),cm=v=>Math.round(v)/10;
-    out.push(`<div style="color:var(--accent);margin-top:2px">${escH(zr.z.name||'區域')}：第一條 ${cm(L.first)} cm＋${L.n} 條 × ${cm(L.each)} cm</div>`);});
+    const id=zr.z.id;
+    out.push(`<div class="strip-ed"><span class="strip-zn">${escH(zr.z.name||'區域')}</span>
+      <label>第一條<input type="number" step="0.1" min="1" value="${cm(L.first)}" onchange="stripSet(${id},'first',+this.value)">cm</label>
+      <label>其餘<button class="icon-btn" onclick="stripSet(${id},'n',${Math.max(1,L.n-1)})">−</button><input type="number" min="1" value="${L.n}" onchange="stripSet(${id},'n',Math.max(1,Math.round(+this.value)))"><button class="icon-btn" onclick="stripSet(${id},'n',${L.n+1})">＋</button>條</label>
+      <span class="strip-each${L.n&&L.each<80?' warn':''}">每條 ${L.n?cm(L.each)+' cm':'—'}</span></div>`);});
     return out.join('');}catch(e){return'';}
 }
 function refreshTileSummary(){
@@ -5373,6 +5418,10 @@ function build3D(){
       for(let i=12;i<=52;i+=8){c2.beginPath();c2.moveTo(i,8);c2.lineTo(i,56);c2.stroke();}
       const top=new THREE.Mesh(new THREE.PlaneGeometry(W*0.9,D*0.9),new THREE.MeshBasicMaterial({map:texFrom(cv)}));
       top.rotation.x=-Math.PI/2;top.position.y=0.65;inner.add(top);
+    } else if(s.type==='tubStand'){
+      inner.add(makeTubStand3D(Ht||95));
+    } else if(s.type==='tubDeck'){
+      inner.add(makeTubDeck3D(W,D,Ht||58));
     } else if(s.type==='bathroomCab'){
       inner.add(makeVanity3D(s,W,D,Ht));inner.position.y=s.lift||0;
     } else {
@@ -5402,6 +5451,8 @@ function build3D(){
     if(s.type==='wallDrain'||s.type==='wallWater'){
       const ro=Math.min(s.w,s.h)/2,ri=ro*(s.type==='wallWater'?0.62:0.86);
       inner.add(makePipe3D(ro,ri,dp,s.type==='wallWater'?0x7FA7C9:0xB8C4CC));
+    } else if(s.type==='showerRain'||s.type==='showerPlain'){
+      inner.add(makeShower3D(s,s.type==='showerRain'));
     } else {
       const m=makeMirrorCab3D(s,dp);m.position.z=dp/2;inner.add(m);
     }
@@ -5629,6 +5680,46 @@ function makeVanity3D(s,W,D,Ht){
 }
 
 // 鏡櫃：與壁磚無關；正面兩扇鏡門（1/3＋2/3）
+// ---- 龍頭（鍍鉻）----
+const CHROME=0xC3C9CE,CHROME_D=0x8E959B;
+function _fx(g){const ch=new THREE.MeshLambertMaterial({color:CHROME}),dk=new THREE.MeshLambertMaterial({color:CHROME_D});
+  const box=(w,h,d,x,y,z,m)=>{const me=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m||ch);me.position.set(x,y,z);g.add(me);return me;};
+  const cyl=(r,h,x,y,z,m,rx,rz)=>{const me=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,18),m||ch);me.position.set(x,y,z);if(rx)me.rotation.x=rx;if(rz)me.rotation.z=rz;g.add(me);return me;};
+  return{box,cyl,ch,dk};}
+// 淋浴龍頭：壁面座標，中心在 (0,0)，寬 s.w、高 s.h，+z 朝室內
+function makeShower3D(s,rain){
+  const g=new THREE.Group(),{box,cyl,dk}=_fx(g),W=s.w||25,H=s.h||100,y0=-H/2,y1=H/2,mY=y0+3.5;
+  cyl(3,1,-8,mY,0.5,null,Math.PI/2);cyl(3,1,8,mY,0.5,null,Math.PI/2);cyl(1,4,-8,mY,2.5,null,Math.PI/2);cyl(1,4,8,mY,2.5,null,Math.PI/2);
+  box(18,5.5,5,0,mY,5);box(2.2,6,2.2,6,mY+4,6,dk);box(2,2,6,0,mY-3,7);
+  if(rain){
+    const top=y1-1.5;cyl(1.2,top-(mY+2.7),0,(top+mY+2.7)/2,6);
+    const L=W/2+4;box(2.4,2.4,L,0,top,6+L/2-1.2);box(W,0.9,W,0,top-1.6,6+L);
+    box(4,2,4,0,mY+H*0.42,7.5,dk);cyl(1.2,16,1.6,mY+H*0.42+6,9.5,null,0.15);box(5,8,2,1.8,mY+H*0.42+17,10.8);
+  } else {
+    const hy=y1-9;box(4,3,4,0,hy,2);cyl(1.2,15,0,hy-6,5.5,null,0.12);box(5,8.5,2,0,hy+4,6.2);
+    const pts=[];for(let i=0;i<=16;i++){const t=i/16;pts.push(new THREE.Vector3(-4*Math.sin(t*Math.PI),(hy-13)*(1-t)+(mY-2)*t,5.5+2*Math.sin(t*Math.PI)));}
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),24,0.5,6,false),dk));
+  }
+  return g;
+}
+// 浴缸龍頭（直立）：地面座標，原點在地面中心；出水口朝 +z
+function makeTubStand3D(Ht){
+  const g=new THREE.Group(),{box,cyl,dk}=_fx(g);
+  cyl(7,1.2,0,0.6,0);cyl(2.4,Ht-4,0,(Ht-4)/2+1,0);
+  box(4.5,2.2,18,0,Ht-2,8);box(4,3,4,0,Ht-3,0);
+  box(1.6,7,3.5,0,Ht*0.62,3,dk);
+  cyl(1.6,8,5,Ht*0.55,0);cyl(1.2,20,5,Ht*0.55+13,0);cyl(1.8,4,5,Ht*0.55+24,0);
+  return g;
+}
+// 浴缸龍頭（檯面）：裝在浴缸檯面上（Ht＝檯面高）；寬 W 方向依序：出水口、冷熱把手、手持蓮蓬頭
+function makeTubDeck3D(W,D,Ht){
+  const g=new THREE.Group(),{box,cyl,dk}=_fx(g),x=f=>-W/2+W*f;
+  [0.13,0.4,0.66,0.88].forEach(f=>cyl(2.6,0.8,x(f),Ht+0.4,0));
+  cyl(2.2,9,x(0.13),Ht+4.5,0);box(4.5,2.2,14,x(0.13),Ht+9,5);
+  [0.4,0.66].forEach(f=>{cyl(1.6,6,x(f),Ht+3.5,0);box(1.4,1.4,7,x(f),Ht+7,2.5,dk);});
+  cyl(1.4,14,x(0.88),Ht+7,0);const hd=cyl(4.6,1.6,x(0.88),Ht+16,-2,null,Math.PI/2.6);
+  return g;
+}
 function makeMirrorCab3D(s,dp){
   const g=new THREE.Group();
   const tr=(c,o)=>new THREE.MeshLambertMaterial({color:c,side:THREE.DoubleSide});
