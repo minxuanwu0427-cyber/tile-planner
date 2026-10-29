@@ -943,7 +943,7 @@ function legendSpecs(){
   const v=state.view;if(!state.spaceDone)return out;
   if(v==='floor'||v==='unfold'){const FA=floorAll();
     if(FA.G&&FA.G.main&&FA.G.main.items&&FA.G.main.items.length)add(floorMainSpec());
-    (FA.zl||[]).forEach(r=>{if(r.strip)add({...r.spec,strip:true});else if((FA.zp||[]).some(pc=>pc.zone===r.z.id))add(r.spec);});}
+    (FA.zl||[]).forEach(r=>{if(r.strip)add(r.spec);else if((FA.zp||[]).some(pc=>pc.zone===r.z.id))add(r.spec);});}
   if(v==='wall'||v==='unfold'){cat='wall';
     const ids=v==='wall'?(state._wHits||[]).filter(h=>h.kind==='seg').map(h=>'seg:'+h.seg.key):wallSegs(P(),innerDim()).map(sg=>'seg:'+sg.key);
     ids.forEach(id=>facePieces(id).forEach(pc=>add(pc.spec&&pc.spec.code==='main'&&!pc.spec.color?{...pc.spec,color:mainColor('wall')}:{...pc.spec,name:pc.spec.code==='main'?tileName('wall'):pc.spec.name})));
@@ -956,7 +956,7 @@ function updateLegend(){
   let L=[];try{L=legendSpecs();}catch(e){L=[];}
   const sig=JSON.stringify(L)+(state.showCut!==false);if(sig===_legSig)return;_legSig=sig;
   const cut=state.showCut!==false;
-  const sw=t=>`<span class="lsw" title="${escH(t.name)}" style="background:${t.strip||!cut?t.color:`linear-gradient(135deg,${t.color} 0 50%,${shadeHex(t.color,CUT_SHADE)} 50% 100%)`}"></span>`;
+  const sw=t=>`<span class="lsw" title="${escH(t.name)}" style="background:${!cut?t.color:`linear-gradient(135deg,${t.color} 0 50%,${shadeHex(t.color,CUT_SHADE)} 50% 100%)`}"></span>`;
   const grp=(c,lb)=>{const a=L.filter(t=>t.cat===c);return a.length?`<span class="li">${a.map(sw).join('')}<span class="lt">${lb}</span></span>`:'';};
   el.innerHTML=L.length?(cut?'<span class="note">淺色整磚・深色裁切</span>':'')+grp('floor','地磚')+grp('wall','壁磚'):'';
 }
@@ -3584,8 +3584,8 @@ function drawFloorZones(X,Y,PX,FA){
     if(zr.strip){
       const L=stripLayout(zr,zl.slice(i+1).flatMap(r=>r.rects)),lw=Math.max(0.6,L.g*PX),col=zr.spec.color||'#DDEAF1';
       L.segs.forEach(sg=>{
-        ctx.fillStyle=col;sg.parts.forEach(q=>ctx.fillRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));
-        if(sg.first){ctx.fillStyle='rgba(47,123,216,.10)';sg.parts.forEach(q=>ctx.fillRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));}
+        // 長條都是依尺寸裁的：一律用裁切色
+        ctx.fillStyle=tileFill(true,col);sg.parts.forEach(q=>ctx.fillRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));
         ctx.strokeStyle='#8FAEC0';ctx.lineWidth=lw;ctx.strokeRect(X+sg.x1*PX+lw/2,Y+sg.y1*PX+lw/2,(sg.x2-sg.x1)*PX-lw,(sg.y2-sg.y1)*PX-lw);
       });
       if(state.showNum!==false)L.segs.forEach(sg=>{
