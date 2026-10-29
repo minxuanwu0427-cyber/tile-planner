@@ -927,7 +927,7 @@ const STICKER_DEFAULTS={
   soilPipe:{w:11.4,h:11.4,label:'糞管'},
   mirrorCab:{w:60,h:60,label:'鏡櫃',wallOnly:true,sill:150},
   showerRain:{w:25,h:125,label:'淋浴龍頭（花灑）',wallOnly:true,sill:90},
-  showerPlain:{w:20,h:65,label:'淋浴龍頭',wallOnly:true,sill:90},
+  showerPlain:{w:20,h:100,label:'淋浴龍頭',wallOnly:true,sill:90},
   tubStand:{w:20,h:20,label:'浴缸龍頭（直立）'},
   tubDeck:{w:45,h:14,label:'浴缸龍頭（檯面）'},
 };
@@ -2806,7 +2806,7 @@ function drawWallStickerSymbol(c,s,px,py,pw,ph){
       const hy=my-ph*0.42;c.beginPath();c.moveTo(cx+2*k,hy);c.lineTo(cx+3*k,hy-14*k);c.stroke();c.strokeRect(cx+1.5*k,hy-20*k,4*k,7*k);
     } else {
       const hy=py+4*k;c.strokeRect(cx-2.5*k,hy,5*k,9*k);c.beginPath();c.moveTo(cx,hy+9*k);c.lineTo(cx,hy+24*k);c.stroke();
-      c.setLineDash([2,2]);c.beginPath();c.moveTo(cx,hy+24*k);c.quadraticCurveTo(cx-6*k,my-4*k,cx-mw/4,my);c.stroke();c.setLineDash([]);
+      c.setLineDash([2,2]);c.beginPath();c.moveTo(cx,hy+24*k);c.bezierCurveTo(cx-8*k,my+2*k,cx-6*k,my+30*k,cx,my+mh);c.stroke();c.setLineDash([]);
     }
   } else if(type==='bathroomCab'){
     // 立面：櫃體（虛線）＋上方面盆檯＋龍頭
@@ -5696,19 +5696,30 @@ function makeShower3D(s,rain){
     const L=W/2+4;box(2.4,2.4,L,0,top,6+L/2-1.2);box(W,0.9,W,0,top-1.6,6+L);
     box(4,2,4,0,mY+H*0.42,7.5,dk);cyl(1.2,16,1.6,mY+H*0.42+6,9.5,null,0.15);box(5,8,2,1.8,mY+H*0.42+17,10.8);
   } else {
-    const hy=y1-9;box(4,3,4,0,hy,2);cyl(1.2,15,0,hy-6,5.5,null,0.12);box(5,8.5,2,0,hy+4,6.2);
-    const pts=[];for(let i=0;i<=16;i++){const t=i/16;pts.push(new THREE.Vector3(-4*Math.sin(t*Math.PI),(hy-13)*(1-t)+(mY-2)*t,5.5+2*Math.sin(t*Math.PI)));}
-    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),24,0.5,6,false),dk));
+    // 蓮蓬頭掛座在最上方；軟管從蓮蓬頭垂下、在混水閥下方繞一圈再接回
+    const hy=y1-12;box(4,3,4,0,hy,2);cyl(1.2,15,0,hy-6,5.5,null,0.12);box(5,8.5,2,0,hy+4,6.2);
+    const low=mY-Math.min(30,H*0.3),pts=[[0,hy-13.5,5.8],[-3,(hy+mY)/2,7],[-7,mY+4,8],[-6,low,7.5],[0,low-4,7],[4,low+3,6.5],[1,mY-3,6]].map(p=>new THREE.Vector3(...p));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),40,0.5,6,false),dk));
   }
   return g;
 }
 // 浴缸龍頭（直立）：地面座標，原點在地面中心；出水口朝 +z
 function makeTubStand3D(Ht){
-  const g=new THREE.Group(),{box,cyl,dk}=_fx(g);
-  cyl(7,1.2,0,0.6,0);cyl(2.4,Ht-4,0,(Ht-4)/2+1,0);
-  box(4.5,2.2,18,0,Ht-2,8);box(4,3,4,0,Ht-3,0);
-  box(1.6,7,3.5,0,Ht*0.62,3,dk);
-  cyl(1.6,8,5,Ht*0.55,0);cyl(1.2,20,5,Ht*0.55+13,0);cyl(1.8,4,5,Ht*0.55+24,0);
+  const g=new THREE.Group(),{box,cyl,ch,dk}=_fx(g),R=1.6;
+  const tube=(pts,r,m)=>g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),48,r,12,false),m||ch));
+  cyl(6.5,1.4,0,0.7,0);cyl(4,1.2,0,2,0);
+  // 立柱＋鵝頸：往上到頂再彎成倒 U，出水口朝下（朝 +z）
+  const top=Ht,rr=11,pts=[new THREE.Vector3(0,2,0),new THREE.Vector3(0,top-rr,0)];
+  for(let k=1;k<=12;k++){const a=Math.PI*k/12;pts.push(new THREE.Vector3(0,top-rr+Math.sin(a)*rr,rr-Math.cos(a)*rr));}
+  pts.push(new THREE.Vector3(0,top-rr-5,2*rr));tube(pts,R);
+  cyl(R*1.15,1.2,0,top-rr-5.4,2*rr,dk);
+  // 混水閥：立柱上的橫向筒身＋上下兩支把手
+  const mY=Ht*0.58;cyl(2.1,9,0,mY,1.5,null,Math.PI/2);cyl(2.1,7,0,mY-6,1.5,null,Math.PI/2);
+  box(0.9,7,0.9,0,mY+4.2,6,dk);box(0.9,6,0.9,0,mY-6-3.6,5.6,dk);
+  // 手持蓮蓬頭：掛在立柱側邊的座上
+  box(5,2.4,2.4,-3.2,mY+11,0);cyl(1.1,20,-6,mY+20,0);cyl(1.5,3,-6,mY+31.5,0);
+  // 軟管：從蓮蓬頭底部垂到地面附近再回到混水閥下方
+  const hz=[[-6,mY+10,0],[-8,mY-12,3],[-9,10,6],[-4,4,7],[1,10,5],[0,mY-10,2]].map(p=>new THREE.Vector3(...p));tube(hz,0.45,dk);
   return g;
 }
 // 浴缸龍頭（檯面）：裝在浴缸檯面上（Ht＝檯面高）；寬 W 方向依序：出水口、冷熱把手、手持蓮蓬頭
@@ -5717,7 +5728,7 @@ function makeTubDeck3D(W,D,Ht){
   [0.13,0.4,0.66,0.88].forEach(f=>cyl(2.6,0.8,x(f),Ht+0.4,0));
   cyl(2.2,9,x(0.13),Ht+4.5,0);box(4.5,2.2,14,x(0.13),Ht+9,5);
   [0.4,0.66].forEach(f=>{cyl(1.6,6,x(f),Ht+3.5,0);box(1.4,1.4,7,x(f),Ht+7,2.5,dk);});
-  cyl(1.4,14,x(0.88),Ht+7,0);const hd=cyl(4.6,1.6,x(0.88),Ht+16,-2,null,Math.PI/2.6);
+  cyl(1.4,14,x(0.88),Ht+7,0);const hd=cyl(4.6,1.6,x(0.88),Ht+16,2,null,-Math.PI/2.6);
   return g;
 }
 function makeMirrorCab3D(s,dp){
