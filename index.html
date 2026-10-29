@@ -3586,11 +3586,11 @@ function drawFloorZones(X,Y,PX,FA){
       L.segs.forEach(sg=>{
         // 長條都是依尺寸裁的：一律用裁切色
         ctx.fillStyle=tileFill(true,col);sg.parts.forEach(q=>ctx.fillRect(X+q.x1*PX,Y+q.y1*PX,(q.x2-q.x1)*PX,(q.y2-q.y1)*PX));
-        ctx.strokeStyle='#8FAEC0';ctx.lineWidth=lw;ctx.strokeRect(X+sg.x1*PX+lw/2,Y+sg.y1*PX+lw/2,(sg.x2-sg.x1)*PX-lw,(sg.y2-sg.y1)*PX-lw);
+        ctx.strokeStyle=state._px?'#A8A296':'#C0BCB4';ctx.lineWidth=lw;ctx.strokeRect(X+sg.x1*PX+lw/2,Y+sg.y1*PX+lw/2,(sg.x2-sg.x1)*PX-lw,(sg.y2-sg.y1)*PX-lw);
       });
       if(state.showNum!==false)L.segs.forEach(sg=>{
         const w=(sg.x2-sg.x1)*PX,h=(sg.y2-sg.y1)*PX,fs=Math.min(state._px?LABEL_MM*PX:10,Math.min(w,h)*0.55);if(fs<5)return;
-        ctx.fillStyle='#4F7489';ctx.font=`${fs}px DM Mono,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillStyle=labelCol(true,col);ctx.font=`${fs}px DM Mono,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.fillText(sg.label,X+(sg.x1+sg.x2)/2*PX,Y+(sg.y1+sg.y2)/2*PX);});
     } else {
       const pcs=FA.zp.filter(pc=>pc.zone===zr.z.id);
