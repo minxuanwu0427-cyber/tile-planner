@@ -785,7 +785,7 @@ canvas{display:block}
     <span id="floorModeCtrl" style="display:flex;align-items:center;gap:8px">
       <span style="color:var(--muted);font-size:12px">模式：</span>
       <button class="mode-btn active" id="modeSelect" onclick="setMode('select')">檢視</button>
-      <button class="mode-btn" id="zedBtn" onclick="openZed(state.view==='floor'?'floor':String(state.orgSel).split('#')[0])" title="劃分地面／牆面的分區，指定各區用哪一種磚">分區設定</button>
+      <button class="mode-btn" id="zedBtn" onclick="openZed(zedFaceFromView())" title="劃分地面／牆面的分區，指定各區用哪一種磚">分區設定</button>
       <button class="mode-btn" id="modeOrigin" onclick="setMode('origin')">起鋪點設定</button>
       <button class="mode-btn" id="modeProc" style="display:none" onclick="setMode('proc')">加工標記</button>
     </span>
@@ -3446,13 +3446,16 @@ function splitSegs(face,W,H){
 function splitRegions(face,W,H){
   const sg=splitSegs(face,W,H),X=new Set([0,W]),Y=new Set([0,H]);
   sg.forEach(g=>{if(g.h){Y.add(g.c);X.add(g.a);X.add(g.b);}else{X.add(g.c);Y.add(g.a);Y.add(g.b);}});
+  // 地面：柱、管道間、L 型缺角不是地面，分區時當成邊界（分切線碰到它們就算封閉）
+  let solid=null;if(face==='floor'){try{const fr=spaceModel().floorRects;if(fr&&fr.length){solid=fr;fr.forEach(r=>{X.add(r.x1);X.add(r.x2);Y.add(r.y1);Y.add(r.y2);});}}catch(e){solid=null;}}
   const xs=[...X].filter(v=>v>=0&&v<=W).sort((a,b)=>a-b),ys=[...Y].filter(v=>v>=0&&v<=H).sort((a,b)=>a-b),nx=xs.length-1,ny=ys.length-1;
   const blk=(h,c,m)=>sg.some(g=>g.h===h&&Math.abs(g.c-c)<0.5&&m>g.a&&m<g.b);
   const id=new Array(nx*ny).fill(-1),regs=[];
-  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){if(id[j*nx+i]>=0)continue;const r=regs.length,cells=[],st=[[i,j]];id[j*nx+i]=r;
+  if(solid)for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const cx=(xs[i]+xs[i+1])/2,cy=(ys[j]+ys[j+1])/2;if(!solid.some(r=>cx>r.x1&&cx<r.x2&&cy>r.y1&&cy<r.y2))id[j*nx+i]=-2;}
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){if(id[j*nx+i]!==-1)continue;const r=regs.length,cells=[],st=[[i,j]];id[j*nx+i]=r;
     while(st.length){const[a,b]=st.pop();cells.push([a,b]);
       const nb=[[a+1,b,!blk(false,xs[a+1],(ys[b]+ys[b+1])/2)],[a-1,b,a>0&&!blk(false,xs[a],(ys[b]+ys[b+1])/2)],[a,b+1,!blk(true,ys[b+1],(xs[a]+xs[a+1])/2)],[a,b-1,b>0&&!blk(true,ys[b],(xs[a]+xs[a+1])/2)]];
-      nb.forEach(([p,q,ok])=>{if(ok&&p>=0&&p<nx&&q>=0&&q<ny&&id[q*nx+p]<0){id[q*nx+p]=r;st.push([p,q]);}});}
+      nb.forEach(([p,q,ok])=>{if(ok&&p>=0&&p<nx&&q>=0&&q<ny&&id[q*nx+p]===-1){id[q*nx+p]=r;st.push([p,q]);}});}
     const rects=cells.map(([a,b])=>({x1:xs[a],y1:ys[b],x2:xs[a+1],y2:ys[b+1]})).filter(q=>q.x2-q.x1>0.5&&q.y2-q.y1>0.5);
     if(rects.length)regs.push({rects,bb:rectsBBox(rects),area:rects.reduce((t,q)=>t+rArea(q),0)});}
   // 區域與設定對應：seed 落在哪一區
@@ -3946,6 +3949,12 @@ function zedTileName(face,code){const t=zedTiles(face).find(t=>t.code===(code||'
 function zedColor(face,code){
   if(!code||code==='main')return face==='floor'?mainColor('floor'):mainColor('wall');
   const t=(face==='floor'?state.floorTypes:state.tileTypes||[]).find(t=>t.code===code);return(t&&t.color)||'#C9DDE8';
+}
+// 目前畫面對應的分區面：地磚圖＝地面；壁磚圖＝正在看的那面牆（同時顯示多段時，優先目前選取的那段）
+function zedFaceFromView(){
+  if(state.view!=='wall')return'floor';
+  const hs=(state._wHits||[]),ids=hs.map(h=>h.kind==='seg'?'seg:'+h.seg.key:'tub:'+h.face.s.id+':'+h.face.edge);
+  const cur=String(state.orgSel||'').split('#')[0];return ids.includes(cur)?cur:(ids[0]||cur);
 }
 function openZed(face){
   if(!state.spaceDone)return;zedBind();
