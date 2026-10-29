@@ -5993,7 +5993,7 @@ function showPair(key,hovLb){
       const m=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,6),new THREE.MeshBasicMaterial({color:new THREE.Color(shadeHex(tc,0.4)),transparent:true,opacity:0.95,depthTest:false}));
       m.position.copy(a.clone().add(b).multiplyScalar(0.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize());m.renderOrder=31;g.add(m);}});
   g.visible=true;
-  if(hint){hint.style.display='inline-flex';{const t0=its[0],c0=t0?((t0.pc.spec&&t0.pc.spec.color)||mainColor(t0.dom==='F'?'floor':'wall')):'#888';hint.style.background=shadeHex(c0,0.42);}
+  if(hint){hint.style.display='inline-flex';{const t0=its[0],c0=t0?((t0.pc.spec&&t0.pc.spec.color)||mainColor(t0.dom==='F'?'floor':'wall')):'#888';const hx=shadeHex(c0,0.42).slice(1),n=parseInt(hx,16);hint.style.background=`rgba(${n>>16&255},${n>>8&255},${n&255},.62)`;hint.style.backdropFilter=hint.style.webkitBackdropFilter='blur(2px)';hint.style.boxShadow='none';}
     hint.textContent=`${its[0]?its[0].base:''}：1 片整磚裁成 `+its.map(t=>`${t.lb}（${pairFaceName(t.face)}）`).join('、')+(V3.pairLock===key?'　🔒 點空白處取消':'');}
 }
 function pairHover(e){
@@ -6012,7 +6012,7 @@ function show3DProcHover(r){
   m.position.copy(a.clone().add(b).multiplyScalar(0.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize());m.renderOrder=30;
   g.add(m);g.visible=true;
   const hint=document.getElementById('placeHint');
-  if(hint){hint.style.display='inline-flex';hint.style.background='#2F7BD8';hint.textContent=(st.cancel?'點擊取消：':st.had?'點擊改為：':'點擊標記：')+state.procType+`（${Math.round(Math.hypot(r.e.x2-r.e.x1,r.e.y2-r.e.y1))/10} cm）`;}
+  if(hint){hint.style.display='inline-flex';hint.style.background='#2F7BD8';hint.style.backdropFilter=hint.style.webkitBackdropFilter='';hint.style.boxShadow='';hint.textContent=(st.cancel?'點擊取消：':st.had?'點擊改為：':'點擊標記：')+state.procType+`（${Math.round(Math.hypot(r.e.x2-r.e.x1,r.e.y2-r.e.y1))/10} cm）`;}
 }
 function worldVisible(o){while(o){if(!o.visible)return false;o=o.parent;}return true;}
 function pickHit(e){
