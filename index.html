@@ -3520,11 +3520,14 @@ function splitRegions(face,W,H){
   const sg=splitSegs(face,W,H),X=new Set([0,W]),Y=new Set([0,H]);
   sg.forEach(g=>{if(g.h){Y.add(g.c);X.add(g.a);X.add(g.b);}else{X.add(g.c);Y.add(g.a);Y.add(g.b);}});
   // 地面：柱、管道間、L 型缺角不是地面，分區時當成邊界（分切線碰到它們就算封閉）
-  let solid=null;if(face==='floor'){try{const fr=spaceModel().floorRects;if(fr&&fr.length){solid=fr;fr.forEach(r=>{X.add(r.x1);X.add(r.x2);Y.add(r.y1);Y.add(r.y2);});}}catch(e){solid=null;}}
+  let solid=null,holes=null;if(face==='floor'){try{const fr=spaceModel().floorRects;if(fr&&fr.length){solid=fr;fr.forEach(r=>{X.add(r.x1);X.add(r.x2);Y.add(r.y1);Y.add(r.y2);});}}catch(e){solid=null;}}
+  // 牆面／浴缸面：門窗、缸口等不貼磚的開口也當成邊界（分切線碰到開口就算封閉）
+  else{try{const b=faceBase(face);holes=((b&&b.excl)||[]).map(e=>({x1:Math.max(0,e.x1),y1:Math.max(0,e.y1),x2:Math.min(W,e.x2),y2:Math.min(H,e.y2)})).filter(e=>e.x2-e.x1>1&&e.y2-e.y1>1);
+    holes.forEach(r=>{X.add(r.x1);X.add(r.x2);Y.add(r.y1);Y.add(r.y2);});}catch(e){holes=null;}}
   const xs=[...X].filter(v=>v>=0&&v<=W).sort((a,b)=>a-b),ys=[...Y].filter(v=>v>=0&&v<=H).sort((a,b)=>a-b),nx=xs.length-1,ny=ys.length-1;
   const blk=(h,c,m)=>sg.some(g=>g.h===h&&Math.abs(g.c-c)<0.5&&m>g.a&&m<g.b);
   const id=new Array(nx*ny).fill(-1),regs=[];
-  if(solid)for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const cx=(xs[i]+xs[i+1])/2,cy=(ys[j]+ys[j+1])/2;if(!solid.some(r=>cx>r.x1&&cx<r.x2&&cy>r.y1&&cy<r.y2))id[j*nx+i]=-2;}
+  if(solid||holes)for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const cx=(xs[i]+xs[i+1])/2,cy=(ys[j]+ys[j+1])/2;if((solid&&!solid.some(r=>cx>r.x1&&cx<r.x2&&cy>r.y1&&cy<r.y2))||(holes&&holes.some(r=>cx>r.x1&&cx<r.x2&&cy>r.y1&&cy<r.y2)))id[j*nx+i]=-2;}
   for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){if(id[j*nx+i]!==-1)continue;const r=regs.length,cells=[],st=[[i,j]];id[j*nx+i]=r;
     while(st.length){const[a,b]=st.pop();cells.push([a,b]);
       const nb=[[a+1,b,!blk(false,xs[a+1],(ys[b]+ys[b+1])/2)],[a-1,b,a>0&&!blk(false,xs[a],(ys[b]+ys[b+1])/2)],[a,b+1,!blk(true,ys[b+1],(xs[a]+xs[a+1])/2)],[a,b-1,b>0&&!blk(true,ys[b],(xs[a]+xs[a+1])/2)]];
@@ -4071,6 +4074,7 @@ function zedPanel(){
       rows.push(`<div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span style="font-size:11px;color:var(--muted);width:56px">${hz?'橫線':'直線'} ${lb}</span><input type="number" step="0.5" value="${v}" style="width:80px" onchange="zedSetSeg(${l.id},${i},this.value)"><span style="font-size:11px;color:var(--muted)">cm</span></div>`);}
     return`<div class="zed-card" style="cursor:default"><div class="zed-h"><span style="font-size:12px;font-weight:600;flex:1">線 ${li+1}</span><button class="icon-btn" title="刪除這條線" onclick="zedDelLine(${l.id})">✕</button></div>${rows.join('')}</div>`;
   }).join('')||'<div class="info-tip">還沒有分切線。</div>';
+  if((sp.lines||[]).length&&regs.length<2)h+=`<div class="info-tip" style="color:#C0392B;margin-top:4px">⚠ 分切線還沒有把這一面完全分開。線的兩端都要碰到邊緣、開口（缸口、門窗、柱）或其他分切線；繞著開口的面，開口另一側也要再畫一條。</div>`;
   h+=`<button class="btn btn-sm${ZED.draft?' btn-p':''}" style="margin-top:4px" onclick="zedStartDraw()">${ZED.draft?'點選中…（Esc 取消）':'＋ 點選新增分切線'}</button>`;
   // 區域
   h+=`<div class="wet-h" style="margin-top:14px">區域（點圖上的區域選取）</div>`;
@@ -4148,8 +4152,13 @@ function zedSnapData(){
   pcs.forEach(pc=>{xs.push({v:pc.x,lbl:'磚縫'});ys.push({v:pc.y,lbl:'磚縫'});});
   return{xs,ys,pts:[]};
 }
+// 面上不貼磚的區塊（地面：柱、管道間、缺角；牆／浴缸面：門窗、缸口…）
+function faceBlockRects(face){
+  try{if(face==='floor'){const sm=spaceModel();return(sm.cols||[]).concat(sm.outRects||[]);}return((faceBase(face)||{}).excl||[]);}catch(e){return[];}
+}
 function zedOnBoundary(x,y){
   if(x<0.5||y<0.5||x>ZED.W-0.5||y>ZED.H-0.5)return true;
+  const E=1;if(faceBlockRects(ZED.face).some(r=>((Math.abs(y-r.y1)<E||Math.abs(y-r.y2)<E)&&x>=r.x1-E&&x<=r.x2+E)||((Math.abs(x-r.x1)<E||Math.abs(x-r.x2)<E)&&y>=r.y1-E&&y<=r.y2+E)))return true;
   return splitSegs(ZED.face,ZED.W,ZED.H).some(g=>g.h?Math.abs(y-g.c)<0.5&&x>=g.a-0.5&&x<=g.b+0.5:Math.abs(x-g.c)<0.5&&y>=g.a-0.5&&y<=g.b+0.5);
 }
 function zedPick(cx,cy){
@@ -5398,8 +5407,11 @@ function build3D(){
       const cap=new THREE.Mesh(new THREE.PlaneGeometry(w,dd),new THREE.MeshBasicMaterial({color:0x6E7274,side:THREE.DoubleSide}));
       cap.rotation.x=-Math.PI/2;cap.position.set(cx,H+0.1,cz);g.add(cap);
       // 實心柱體：比外露面內縮 3mm，從任何角度剖開都是實心
-      const core=new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.1,w-0.6),H-0.2,Math.max(0.1,dd-0.6)),new THREE.MeshLambertMaterial({color:0x6E7274}));
-      core.position.set(cx,H/2,cz);g.add(core);
+      // 只有貼磚的外露面內縮；靠牆那側做滿，剖開時整支柱子都是灰色（也蓋過伸進柱子裡的浴缸裙邊）
+      const fsg=ci.faces.map(k=>smC.segs.find(sg=>sg.key===k)).filter(Boolean),on=(ax,c)=>fsg.some(f=>f.axis===ax&&Math.abs(f.c-c)<1);
+      const k=0.3,ix1=b.x1/10+(on('v',b.x1)?k:0),ix2=b.x2/10-(on('v',b.x2)?k:0),iz1=b.y1/10+(on('h',b.y1)?k:0),iz2=b.y2/10-(on('h',b.y2)?k:0);
+      const core=new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.1,ix2-ix1),H-0.2,Math.max(0.1,iz2-iz1)),new THREE.MeshLambertMaterial({color:0x6E7274,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+      core.position.set((ix1+ix2)/2,H/2,(iz1+iz2)/2);g.add(core);
     }
     root.add(g);V3.attached.push({obj:g,walls:ci.faces});
   });
@@ -5617,9 +5629,10 @@ function makeBuiltinTub3D(s,Ht){
   const faces=tubFaces().filter(f=>f.s===s);
   const cs=1,sn=0; // 浴缸以平面方向建模，不旋轉
   const edgeOf=(lx,lz)=>{const x=Math.round(lx*cs-lz*sn),y=Math.round(lx*sn+lz*cs);return x===1?'e':x===-1?'w':y===1?'s':'n';};
+  const cutMat=new THREE.MeshBasicMaterial({color:0x8E877D}); // 靠牆的面（前方牆隱藏時看到的是剖面）
   const faceMat=(lx,lz)=>{
     const f=faces.find(f=>f.kind==='apron'&&f.edge===edgeOf(lx,lz));
-    if(!f)return apron;
+    if(!f)return cutMat;
     const cv=offscreenSurface(f.w,f.h,sc=>drawTubFaceSurface(f,0,0,sc));
     return new THREE.MeshBasicMaterial({map:texFrom(cv)});
   };
